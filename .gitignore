@@ -1,0 +1,13 @@
+# Runtime database and private user uploads (auto-created by server.mjs)
+data/
+
+# Environment variables & local secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies, logs, and OS artifacts
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
