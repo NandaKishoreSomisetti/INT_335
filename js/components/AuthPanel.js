@@ -10,8 +10,8 @@
  * - Post-interaction validation, email verification state handling, and user-friendly status feedback
  */
 
-import { authService } from '../services/authService.js';
-import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js';
+import { authService } from '../services/authService.js?v=sb3';
+import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb3';
 
 function escapeHtml(str) {
   return String(str)
@@ -438,31 +438,12 @@ export class AuthPanel {
       try {
         await authService.login({ email, password, rememberMe });
       } catch (error) {
-        console.error('Supabase login error:', error);
-        if (error?.requiresVerification) {
-          this.verificationPending = {
-            email: email.trim(),
-            message: error.message,
-          };
-          this.render();
-          return;
-        }
-        if (error?.isConfigurationMissing) {
-          const rememberNote = rememberMe
-            ? 'Your email has been remembered on this device for your next visit.'
-            : '';
-          this.statusBanner = {
-            type: 'config',
-            title: 'Sign-in configuration error',
-            message: `${error.message}${rememberNote ? ` ${rememberNote}` : ''}`,
-          };
-        } else {
-          this.statusBanner = {
-            type: 'error',
-            title: 'Log in failed',
-            message: error?.message || String(error),
-          };
-        }
+        console.error('Auth error details:', error);
+        this.statusBanner = {
+          type: error?.isConfigurationMissing ? 'config' : 'error',
+          title: 'Log in failed',
+          message: error?.message || String(error),
+        };
         this.updateStatusSlot();
       } finally {
         this.setSubmittingState(false, 'login');
@@ -494,30 +475,14 @@ export class AuthPanel {
       this.setSubmittingState(true, 'signup');
 
       try {
-        const result = await authService.signUp({ fullName, email, password });
-        if (result?.requiresVerification) {
-          this.verificationPending = {
-            email: result.email || email.trim(),
-            message: result.message,
-          };
-          this.render();
-          return;
-        }
+        await authService.signUp({ fullName, email, password });
       } catch (error) {
-        console.error('Supabase signup error:', error);
-        if (error?.isConfigurationMissing) {
-          this.statusBanner = {
-            type: 'config',
-            title: 'Registration configuration error',
-            message: error.message,
-          };
-        } else {
-          this.statusBanner = {
-            type: 'error',
-            title: 'Sign up failed',
-            message: error?.message || String(error),
-          };
-        }
+        console.error('Auth error details:', error);
+        this.statusBanner = {
+          type: error?.isConfigurationMissing ? 'config' : 'error',
+          title: 'Sign up failed',
+          message: error?.message || String(error),
+        };
         this.updateStatusSlot();
       } finally {
         this.setSubmittingState(false, 'signup');

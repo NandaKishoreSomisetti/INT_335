@@ -11,8 +11,8 @@
  *    and guards any `public.profiles` reads/updates behind an active authenticated session.
  */
 
-import { AUTH_CONFIG, SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js';
-import { getSupabaseClient } from './supabaseClient.js';
+import { AUTH_CONFIG, SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb3';
+import { getSupabaseClient } from './supabaseClient.js?v=sb3';
 
 export class AuthConfigurationError extends Error {
   constructor(message) {
@@ -457,17 +457,17 @@ class AuthService {
       });
 
       if (error) {
-        console.error('Supabase login error:', error);
-        const authErr = new Error(error.message || 'Authentication failed.');
+        console.error('Auth error details:', error);
+        const authErr = new Error(error.message);
         authErr.code = error.code;
         authErr.status = error.status;
         throw authErr;
       }
 
-      if (data?.session && data?.session?.user) {
+      if (data?.session) {
         this.accessToken = data.session.access_token || null;
         // Immediately store user in client state and route to main dashboard
-        const immediateUser = this.normalizeUser(data.session.user);
+        const immediateUser = this.normalizeUser(data.session.user || data.user);
         this.currentUser = immediateUser;
         this.saveCachedUserProfile(immediateUser);
         this.notify();
@@ -495,7 +495,10 @@ class AuthService {
         return this.currentUser;
       }
 
-      throw new Error('No active session returned from Supabase.');
+      throw new Error('Authentication failed: no session returned.');
+    } catch (error) {
+      console.error('Auth error details:', error);
+      throw error;
     } finally {
       this.ignoreNextAuthEvent = false;
     }
@@ -523,7 +526,7 @@ class AuthService {
 
     this.ignoreNextAuthEvent = true;
     try {
-      // Register user exclusively through supabase.auth.signUp (never insert raw passwords into tables)
+      // Register user exclusively through supabase.auth.signUp (never manually hash or insert passwords)
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
@@ -537,8 +540,8 @@ class AuthService {
       });
 
       if (error) {
-        console.error('Supabase signup error:', error);
-        const signUpErr = new Error(error.message || 'Sign up failed.');
+        console.error('Auth error details:', error);
+        const signUpErr = new Error(error.message);
         signUpErr.code = error.code;
         signUpErr.status = error.status;
         throw signUpErr;
@@ -550,15 +553,17 @@ class AuthService {
         Array.isArray(data.user.identities) &&
         data.user.identities.length === 0
       ) {
-        const dupError = new Error('User already registered with this email address.');
-        console.error('Supabase signup error:', dupError);
+        const dupError = new Error('User already registered');
+        console.error('Auth error details:', dupError);
         throw dupError;
       }
 
-      // Case 1: Active session returned immediately by Supabase
-      if (data?.session && data?.user) {
+      // Auto-login on Sign Up when a session is returned (`data.session`)
+      if (data?.session) {
         this.accessToken = data.session.access_token || null;
-        const immediateUser = this.normalizeUser(data.user, null, { fullName: cleanName });
+        const immediateUser = this.normalizeUser(data.session.user || data.user, null, {
+          fullName: cleanName,
+        });
         this.currentUser = immediateUser;
         this.saveCachedUserProfile(immediateUser);
         this.notify();
@@ -567,7 +572,8 @@ class AuthService {
         return this.currentUser;
       }
 
-      // Case 2: User created in auth.users (session is null if email confirmation is enabled)
+      // If user record is returned without an active session (e.g. email confirmation enabled),
+      // auto-transition to the dashboard so the user is not forced to re-enter credentials
       if (data?.user) {
         const createdUser = this.normalizeUser(data.user, null, { fullName: cleanName });
         this.currentUser = createdUser;
@@ -576,9 +582,12 @@ class AuthService {
         return this.currentUser;
       }
 
-      const unknownErr = new Error('Supabase signUp completed without returning a user record.');
-      console.error('Supabase signup error:', unknownErr);
+      const unknownErr = new Error('Sign up completed without returning a user session.');
+      console.error('Auth error details:', unknownErr);
       throw unknownErr;
+    } catch (error) {
+      console.error('Auth error details:', error);
+      throw error;
     } finally {
       this.ignoreNextAuthEvent = false;
     }

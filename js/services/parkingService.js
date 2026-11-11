@@ -13,8 +13,8 @@
  * 6. Submits unverified user section reports and executes role-protected staff updates.
  */
 
-import { PARKING_CONFIG } from '../config.js';
-import { authService } from './authService.js';
+import { PARKING_CONFIG } from '../config.js?v=sb3';
+import { authService } from './authService.js?v=sb3';
 
 function buildHeaders(extra = {}) {
   const headers = { Accept: 'application/json', ...extra };

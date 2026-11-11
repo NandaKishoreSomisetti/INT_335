@@ -11,6 +11,20 @@ const globalConfig =
 const nodeEnv =
   typeof process !== 'undefined' && process && process.env ? process.env : {};
 
+/**
+ * Support team email address.
+ * Rendered as a working mailto: link in the Support modal.
+ */
+export const SUPPORT_EMAIL =
+  globalConfig.SUPPORT_EMAIL ?? 'parktrace.1341@gmail.com';
+
+/**
+ * Temporary customer-care number.
+ * Calling is disabled for this demo number.
+ */
+export const SUPPORT_PHONE =
+  globalConfig.SUPPORT_PHONE ?? '00000 00000 — Demo number';
+
 export const SUPABASE_CONFIG = {
   /**
    * Public Supabase project URL (`NEXT_PUBLIC_SUPABASE_URL`).
@@ -30,31 +44,27 @@ export const SUPABASE_CONFIG = {
 };
 
 export const AUTH_CONFIG = {
-  /**
-   * Base URL for the server-side authentication & profile synchronization API.
-   */
   baseUrl: globalConfig.AUTH_API_BASE_URL ?? '/api/auth',
-
   endpoints: {
     login: '/login',
     signup: '/signup',
+    signUp: '/signup',
     logout: '/logout',
     session: '/session',
     profile: '/profile',
   },
+  storageKeys: {
+    rememberedEmail: 'parktrace.remembered_email',
+    rememberPreference: 'parktrace.remember_me_enabled',
+  },
 };
 
 export const REVIEWS_CONFIG = {
-  /**
-   * Base URL for the shared persistent Reviews & Likes REST API.
-   */
   baseUrl: globalConfig.REVIEWS_API_BASE_URL ?? '/api/reviews',
+  pageSize: 6,
 };
 
 export const PARKING_CONFIG = {
-  /**
-   * Base URL for campus parking lots, sections, QR lookup, sessions, and staff updates.
-   */
   baseUrl: globalConfig.PARKING_API_BASE_URL ?? '/api/parking',
   sessionsUrl: globalConfig.SESSIONS_API_BASE_URL ?? '/api/sessions',
   reportsUrl: globalConfig.REPORTS_API_BASE_URL ?? '/api/reports',
@@ -62,22 +72,18 @@ export const PARKING_CONFIG = {
 };
 
 export const SUPPORT_CONFIG = {
-  /**
-   * Support email address and phone number displayed in the Support modal.
-   */
-  supportEmail: globalConfig.SUPPORT_EMAIL ?? 'parktrace.1341@gmail.com',
-  supportPhoneDisplay: globalConfig.SUPPORT_PHONE_DISPLAY ?? '+91 75692 05626',
+  supportEmail: SUPPORT_EMAIL,
+  supportPhoneDisplay: SUPPORT_PHONE,
   supportPhoneHref: globalConfig.SUPPORT_PHONE_HREF ?? 'tel:+917569205626',
   hoursLabel: globalConfig.SUPPORT_HOURS ?? 'Mon – Sat, 7:30 AM – 8:30 PM Campus Time',
-  officeLocation: globalConfig.SUPPORT_OFFICE ?? 'Campus Mobility & Security Desk, Block A Ground Floor',
+  officeLocation:
+    globalConfig.SUPPORT_OFFICE ?? 'Campus Mobility & Security Desk, Block A Ground Floor',
 };
 
 export const ASSET_CONFIG = {
-  /**
-   * Clean photographic background asset path.
-   */
   heroImageUrl: globalConfig.HERO_IMAGE_URL ?? './assets/hero-car-clean.jpg',
-  heroImageAlt: '',
+  heroImageAlt: globalConfig.HERO_IMAGE_ALT ?? '',
+  logoUrl: globalConfig.LOGO_URL ?? './assets/parktrace-logo.png',
 };
 
 export const STORAGE_KEYS = {

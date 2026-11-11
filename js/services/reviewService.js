@@ -12,8 +12,8 @@
  * 4. Notifies all subscribed views so public and authenticated review feeds stay in sync.
  */
 
-import { REVIEWS_CONFIG } from '../config.js';
-import { authService } from './authService.js';
+import { REVIEWS_CONFIG } from '../config.js?v=sb3';
+import { authService } from './authService.js?v=sb3';
 
 function buildHeaders(extra = {}) {
   const headers = { Accept: 'application/json', ...extra };

@@ -611,7 +611,7 @@ async function handleApiRequest(req, res, url) {
     });
 
     if (error) {
-      console.error('Supabase signup error:', error);
+      console.error('Auth error details:', error);
       const status = error.status && error.status >= 400 ? error.status : 400;
       return sendJson(res, status, { message: error.message });
     }
@@ -692,16 +692,10 @@ async function handleApiRequest(req, res, url) {
     });
 
     if (error || !data?.session || !data?.user) {
-      const rawMsg = String(error?.message || '').toLowerCase();
-      if (rawMsg.includes('email not confirmed')) {
-        return sendJson(res, 403, {
-          requiresVerification: true,
-          message:
-            'Please verify your email address before signing in. Check your inbox for the confirmation link.',
-        });
-      }
-      return sendJson(res, 401, {
-        message: 'Invalid email or password. Please check your credentials and try again.',
+      console.error('Auth error details:', error);
+      const status = error?.status && error.status >= 400 ? error.status : 401;
+      return sendJson(res, status, {
+        message: error?.message || 'Authentication failed: no active session returned.',
       });
     }
 
@@ -1927,12 +1921,16 @@ function handleStaticRequest(req, res, url) {
 
     const isCodeOrMarkup =
       ext === '.html' || ext === '.js' || ext === '.mjs' || ext === '.css';
-    res.writeHead(200, {
+    const responseHeaders = {
       'Content-Type': contentType,
       'Cache-Control': isCodeOrMarkup
         ? 'no-store, no-cache, must-revalidate'
         : 'public, max-age=3600',
-    });
+    };
+    if (ext === '.html') {
+      responseHeaders['Clear-Site-Data'] = '"cache"';
+    }
+    res.writeHead(200, responseHeaders);
 
     const stream = fs.createReadStream(absolutePath);
     stream.on('error', () => {

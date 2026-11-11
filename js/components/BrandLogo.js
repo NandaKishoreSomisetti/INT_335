@@ -12,7 +12,7 @@
  *   and `alt="PARKTRACE"` when rendered as the sole brand label.
  */
 
-import { ASSET_CONFIG } from '../config.js';
+import { ASSET_CONFIG } from '../config.js?v=sb3';
 
 function escapeAttr(value) {
   return String(value)

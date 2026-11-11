@@ -9,7 +9,7 @@
  * `createClient(supabaseUrl, supabaseAnonKey)`.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb3';
 
 let supabaseInstance = null;
 let createClientFn = null;
