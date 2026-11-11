@@ -6,7 +6,7 @@
  * `mailto:` link and keeps calling disabled for the demo customer-care number.
  */
 
-import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../config.js?v=sb3';
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../config.js?v=sb5';
 
 function isValidEmail(value) {
   if (!value || typeof value !== 'string') return false;

@@ -2,28 +2,12 @@
  * Campus Parking Discovery, Saved Vehicle Sessions & Staff Maintenance Service
  * (js/services/parkingService.js)
  *
- * Responsibilities:
- * 1. Fetches configured campus parking lots, vehicle sections, and freshness settings.
- * 2. Filters and recommends suitable parking sections based on vehicle compatibility,
- *    access restrictions, availability & freshness, and destination proximity.
- * 3. Offers legitimate alternatives when the closest section is Full or Closed.
- * 4. Manages the authenticated user's private saved parking session (lot -> section -> row -> bay,
- *    optional GPS pin, note, and private photo) without altering verified physical occupancy.
- * 5. Handles QR section code lookups with strict validation.
- * 6. Submits unverified user section reports and executes role-protected staff updates.
+ * GitHub Pages & Static-Host Compatible:
+ * - Operates directly in the browser without calling relative `/api/parking` or
+ *   `/api/sessions` routes (preventing 404 / 405 Method Not Allowed on GitHub Pages).
  */
 
-import { PARKING_CONFIG } from '../config.js?v=sb3';
-import { authService } from './authService.js?v=sb3';
-
-function buildHeaders(extra = {}) {
-  const headers = { Accept: 'application/json', ...extra };
-  const token = authService.getAccessToken?.();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-  return headers;
-}
+import { authService } from './authService.js?v=sb5';
 
 const STATUS_PRIORITY = {
   Available: 1,
@@ -33,10 +17,20 @@ const STATUS_PRIORITY = {
   Closed: 5,
 };
 
-function getDefaultParkingCatalog() {
+const STORAGE_KEYS = {
+  catalog: 'parktrace.parking_catalog.v1',
+  sessions: 'parktrace.parking_sessions.v1',
+  reports: 'parktrace.section_reports.v1',
+  auditLogs: 'parktrace.staff_audit_logs.v1',
+};
+
+function createInitialCatalog() {
   const nowIso = new Date().toISOString();
   return {
-    settings: { freshnessMinutes: 60, staleVehicleHours: 12 },
+    settings: {
+      freshnessMinutes: 60,
+      staleVehicleHours: 12,
+    },
     destinations: [
       'Academic Block A',
       'Academic Block B',
@@ -72,7 +66,6 @@ function getDefaultParkingCatalog() {
       {
         id: 'sec-a-bike-1',
         lotId: 'lot-north-academic',
-        lotName: 'North Academic Lot A',
         code: 'PT-SEC-A1',
         name: 'Section A1 — Two-Wheeler Deck',
         vehicleTypes: ['bike'],
@@ -83,8 +76,6 @@ function getDefaultParkingCatalog() {
         totalCapacity: 120,
         availableSpots: 34,
         status: 'Available',
-        effectiveStatus: 'Available',
-        isStale: false,
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
         rows: ['Row A', 'Row B', 'Row C', 'Row D'],
@@ -93,7 +84,6 @@ function getDefaultParkingCatalog() {
       {
         id: 'sec-a-car-2',
         lotId: 'lot-north-academic',
-        lotName: 'North Academic Lot A',
         code: 'PT-SEC-A2',
         name: 'Section A2 — Four-Wheeler Court',
         vehicleTypes: ['car'],
@@ -104,17 +94,50 @@ function getDefaultParkingCatalog() {
         totalCapacity: 45,
         availableSpots: 5,
         status: 'Limited',
-        effectiveStatus: 'Limited',
-        isStale: false,
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
         rows: ['Row 1', 'Row 2', 'Row 3'],
         landmarkHint: 'Near North Gate Solar Canopy',
       },
       {
+        id: 'sec-a-accessible-3',
+        lotId: 'lot-north-academic',
+        code: 'PT-SEC-A3',
+        name: 'Section A3 — Accessible & EV Priority Bays',
+        vehicleTypes: ['bike', 'car', 'other'],
+        destination: 'Central Library & Research Hub',
+        walkingMinutes: 1,
+        accessRule: 'accessible',
+        accessLabel: 'Accessible / EV Priority Permit Required',
+        totalCapacity: 20,
+        availableSpots: 9,
+        status: 'Available',
+        updatedAt: nowIso,
+        updatedBy: 'Campus Attendant Desk',
+        rows: ['Priority Row P1', 'Priority Row P2'],
+        landmarkHint: 'Step-free ramp entrance beside Central Library West Doors',
+      },
+      {
+        id: 'sec-b-bike-1',
+        lotId: 'lot-east-innovation',
+        code: 'PT-SEC-B1',
+        name: 'Section B1 — East Bike & Scooter Bay',
+        vehicleTypes: ['bike'],
+        destination: 'Engineering & Innovation Wing',
+        walkingMinutes: 2,
+        accessRule: 'general',
+        accessLabel: 'Students & Staff',
+        totalCapacity: 150,
+        availableSpots: 0,
+        status: 'Full',
+        updatedAt: nowIso,
+        updatedBy: 'Campus Attendant Desk',
+        rows: ['Row E1', 'Row E2', 'Row E3', 'Row E4'],
+        landmarkHint: 'Beside Robotics Workshop Entrance',
+      },
+      {
         id: 'sec-b-car-2',
         lotId: 'lot-east-innovation',
-        lotName: 'East Innovation Lot B',
         code: 'PT-SEC-B2',
         name: 'Section B2 — East Car & Utility Section',
         vehicleTypes: ['car', 'other'],
@@ -125,8 +148,6 @@ function getDefaultParkingCatalog() {
         totalCapacity: 60,
         availableSpots: 22,
         status: 'Available',
-        effectiveStatus: 'Available',
-        isStale: false,
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
         rows: ['Row C1', 'Row C2', 'Row C3'],
@@ -135,7 +156,6 @@ function getDefaultParkingCatalog() {
       {
         id: 'sec-c-multi-1',
         lotId: 'lot-south-commons',
-        lotName: 'South Commons Lot C',
         code: 'PT-SEC-C1',
         name: 'Section C1 — South Overflow Two-Wheeler Zone',
         vehicleTypes: ['bike'],
@@ -146,26 +166,97 @@ function getDefaultParkingCatalog() {
         totalCapacity: 180,
         availableSpots: 92,
         status: 'Available',
-        effectiveStatus: 'Available',
-        isStale: false,
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
         rows: ['Row S1', 'Row S2', 'Row S3', 'Row S4', 'Row S5'],
         landmarkHint: 'Covered walkway linking South Commons to Engineering Wing',
       },
+      {
+        id: 'sec-c-staff-2',
+        lotId: 'lot-south-commons',
+        code: 'PT-SEC-C2',
+        name: 'Section C2 — Faculty & Staff Reserved Court',
+        vehicleTypes: ['bike', 'car', 'other'],
+        destination: 'Administrative & Security Complex',
+        walkingMinutes: 2,
+        accessRule: 'staff_only',
+        accessLabel: 'Staff & Faculty Permit Only',
+        totalCapacity: 40,
+        availableSpots: 14,
+        status: 'Available',
+        updatedAt: nowIso,
+        updatedBy: 'Campus Attendant Desk',
+        rows: ['Staff Row R1', 'Staff Row R2'],
+        landmarkHint: 'Behind Administrative Block Security Barrier',
+      },
     ],
   };
 }
 
-/**
- * Pure recommendation & filtering helper for Find Parking (Requirement 7).
- *
- * @param {Array} sections
- * @param {Object} filters
- * @param {string} [filters.vehicleType=''] - 'bike' | 'car' | 'other' | ''
- * @param {string} [filters.destination=''] - Destination string or ''
- * @returns {{ primaryMatches: Array, alternatives: Array, allPrimaryFullOrClosed: boolean }}
- */
+function readJsonStorage(key, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function computeFreshnessState(section, settings) {
+  const thresholdMs = (Number(settings?.freshnessMinutes) || 60) * 60 * 1000;
+  const updatedMs = section.updatedAt ? Date.parse(section.updatedAt) : 0;
+  const ageMs = updatedMs ? Math.max(0, Date.now() - updatedMs) : Infinity;
+  const isStale = !updatedMs || ageMs > thresholdMs;
+
+  return {
+    ...section,
+    isStale,
+    ageMinutes: Number.isFinite(ageMs) ? Math.floor(ageMs / 60000) : null,
+    effectiveStatus: isStale && section.status !== 'Closed' ? 'Unknown' : section.status,
+  };
+}
+
+function computeSessionState(session, settings) {
+  if (!session) return null;
+  const staleHours = Number(settings?.staleVehicleHours) || 12;
+  const parkedMs = session.parkedAt ? Date.parse(session.parkedAt) : Date.now();
+  const elapsedMs = Math.max(0, Date.now() - parkedMs);
+  const elapsedMinutes = Math.floor(elapsedMs / 60000);
+  const isLongRunning = elapsedMs > staleHours * 3600 * 1000;
+
+  return {
+    id: session.id,
+    userId: session.userId,
+    lotId: session.lotId,
+    lotName: session.lotName,
+    sectionId: session.sectionId,
+    sectionCode: session.sectionCode,
+    sectionName: session.sectionName,
+    vehicleType: session.vehicleType,
+    rowIdentifier: session.rowIdentifier || '',
+    bayIdentifier: session.bayIdentifier || '',
+    landmarkNote: session.landmarkNote || '',
+    gpsCoords: session.gpsCoords || null,
+    hasPhoto: Boolean(session.photoDataUrl),
+    photoUrl: session.photoDataUrl || null,
+    parkedAt: session.parkedAt,
+    updatedAt: session.updatedAt,
+    elapsedMinutes,
+    isLongRunning,
+    staleThresholdHours: staleHours,
+  };
+}
+
 export function recommendParkingSections(
   sections = [],
   { vehicleType = '', destination = '' } = {}
@@ -173,7 +264,6 @@ export function recommendParkingSections(
   const cleanVehicle = (vehicleType || '').trim().toLowerCase();
   const cleanDest = (destination || '').trim().toLowerCase();
 
-  // 1. Filter by vehicle compatibility
   const compatible = sections.filter((sec) => {
     if (!cleanVehicle) return true;
     const types = Array.isArray(sec.vehicleTypes) ? sec.vehicleTypes : [];
@@ -239,10 +329,23 @@ class ParkingService {
     this.activeSession = null;
     this.listeners = new Set();
 
-    // Register cache wipe on logout
     authService.onClearAccountCache(() => {
       this.clearClientCaches();
     });
+  }
+
+  loadCatalog() {
+    const stored = readJsonStorage(STORAGE_KEYS.catalog, null);
+    if (stored && Array.isArray(stored.sections) && Array.isArray(stored.lots)) {
+      return stored;
+    }
+    const initial = createInitialCatalog();
+    writeJsonStorage(STORAGE_KEYS.catalog, initial);
+    return initial;
+  }
+
+  saveCatalog(catalog) {
+    writeJsonStorage(STORAGE_KEYS.catalog, catalog);
   }
 
   subscribe(listener) {
@@ -275,38 +378,17 @@ class ParkingService {
   }
 
   async fetchParkingData() {
-    try {
-      const response = await fetch(PARKING_CONFIG.baseUrl.replace(/\/$/, ''), {
-        method: 'GET',
-        credentials: 'include',
-        headers: buildHeaders(),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (response.ok && Array.isArray(payload.sections)) {
-        this.lots = Array.isArray(payload.lots) ? payload.lots : [];
-        this.sections = Array.isArray(payload.sections) ? payload.sections : [];
-        this.destinations = Array.isArray(payload.destinations) ? payload.destinations : [];
-        if (payload.settings) {
-          this.settings = { ...this.settings, ...payload.settings };
-        }
-        this.notify();
-        return {
-          lots: this.lots,
-          sections: this.sections,
-          destinations: this.destinations,
-          settings: this.settings,
-        };
-      }
-    } catch {
-      // Fall back to default catalog when running without local API server
-    }
-
-    const fallback = getDefaultParkingCatalog();
-    this.lots = fallback.lots;
-    this.sections = fallback.sections;
-    this.destinations = fallback.destinations;
-    this.settings = { ...this.settings, ...fallback.settings };
+    const catalog = this.loadCatalog();
+    this.settings = { ...this.settings, ...(catalog.settings || {}) };
+    this.lots = catalog.lots.filter((l) => l.active !== false);
+    this.destinations = Array.isArray(catalog.destinations) ? catalog.destinations : [];
+    this.sections = catalog.sections.map((sec) => {
+      const lot = catalog.lots.find((l) => l.id === sec.lotId);
+      return {
+        ...computeFreshnessState(sec, this.settings),
+        lotName: lot ? lot.name : 'Campus Parking Lot',
+      };
+    });
     this.notify();
     return {
       lots: this.lots,
@@ -317,120 +399,213 @@ class ParkingService {
   }
 
   async lookupSectionByQr(rawCode) {
-    const code = String(rawCode || '').trim();
-    if (!code || !/^[A-Za-z0-9_-]+$/.test(code)) {
+    const code = String(rawCode || '')
+      .trim()
+      .toUpperCase();
+    if (!code || !/^[A-Z0-9_-]+$/.test(code)) {
       throw new Error(
         'Invalid section or QR code format. Only valid campus section codes are accepted.'
       );
     }
 
-    try {
-      const endpoint = `${PARKING_CONFIG.baseUrl.replace(/\/$/, '')}/qr/${encodeURIComponent(code)}`;
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        credentials: 'include',
-        headers: buildHeaders(),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (response.ok && payload.section) {
-        return payload.section;
-      }
-    } catch {
-      // Check in-memory sections as fallback
-    }
-
-    const upper = code.toUpperCase();
-    const localMatch = (this.sections.length ? this.sections : getDefaultParkingCatalog().sections).find(
+    const catalog = this.loadCatalog();
+    const section = catalog.sections.find(
       (sec) =>
-        String(sec.code || '').toUpperCase() === upper ||
-        String(sec.id || '').toUpperCase() === upper
+        String(sec.code || '').toUpperCase() === code ||
+        String(sec.id || '').toUpperCase() === code
     );
-    if (localMatch) {
-      return localMatch;
+    if (!section) {
+      throw new Error('No configured parking section matched that QR or section code.');
     }
 
-    throw new Error('No configured parking section matched that QR or section code.');
+    const lot = catalog.lots.find((l) => l.id === section.lotId);
+    return {
+      ...computeFreshnessState(section, catalog.settings),
+      lotName: lot ? lot.name : 'Campus Parking Lot',
+    };
   }
 
   async fetchActiveSession() {
-    try {
-      const endpoint = `${PARKING_CONFIG.sessionsUrl.replace(/\/$/, '')}/active`;
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        credentials: 'include',
-        headers: buildHeaders(),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (response.ok) {
-        this.activeSession = payload.session || null;
-        this.notify();
-        return this.activeSession;
-      }
-    } catch {
-      // Ignore network error when running in static mode
+    const user = authService.currentUser;
+    if (!user?.id) {
+      this.activeSession = null;
+      this.notify();
+      return null;
     }
 
+    const catalog = this.loadCatalog();
+    const allSessions = readJsonStorage(STORAGE_KEYS.sessions, []);
+    const active = allSessions.find((s) => s.userId === user.id && s.status === 'active');
+    this.activeSession = computeSessionState(active || null, catalog.settings);
     this.notify();
     return this.activeSession;
   }
 
   async saveParkingSession(sessionData) {
-    const endpoint = PARKING_CONFIG.sessionsUrl.replace(/\/$/, '');
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(sessionData),
-    });
+    const user = authService.currentUser;
+    if (!user?.id) {
+      throw new Error('Authentication required to save a parking location.');
+    }
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    const catalog = this.loadCatalog();
+    const allSessions = readJsonStorage(STORAGE_KEYS.sessions, []);
+    const existingActive = allSessions.find((s) => s.userId === user.id && s.status === 'active');
+
+    if (existingActive && !sessionData.replaceExisting) {
       const err = new Error(
-        payload.message || 'Could not save your parking location. Please try again.'
+        'You already have an active parked vehicle saved. Replace your existing session or update it instead.'
       );
-      err.code = payload.code || null;
+      err.code = 'ACTIVE_SESSION_EXISTS';
       throw err;
     }
 
-    this.activeSession = payload.session || null;
+    const sectionId = String(sessionData.sectionId || '').trim();
+    const section = catalog.sections.find((s) => s.id === sectionId || s.code === sectionId);
+    if (!section) {
+      throw new Error('Please select a valid campus parking section.');
+    }
+
+    const vehicleType = String(sessionData.vehicleType || '')
+      .trim()
+      .toLowerCase();
+    if (!['bike', 'car', 'other'].includes(vehicleType)) {
+      throw new Error('Please select your vehicle type (Bike, Car, or Other).');
+    }
+
+    if (!section.vehicleTypes.includes(vehicleType)) {
+      throw new Error(
+        `Selected section (${section.name}) does not support ${vehicleType} parking.`
+      );
+    }
+
+    if (section.accessRule === 'staff_only' && user.role !== 'staff') {
+      throw new Error(
+        'This section is reserved for authorized campus staff and faculty permits.'
+      );
+    }
+
+    if (existingActive) {
+      existingActive.status = 'completed';
+      existingActive.endedAt = new Date().toISOString();
+    }
+
+    const lot = catalog.lots.find((l) => l.id === section.lotId);
+    const nowIso = new Date().toISOString();
+    const newSession = {
+      id: `ps_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      userId: user.id,
+      lotId: section.lotId,
+      lotName: lot ? lot.name : 'Campus Parking Lot',
+      sectionId: section.id,
+      sectionCode: section.code,
+      sectionName: section.name,
+      vehicleType,
+      rowIdentifier: String(sessionData.rowIdentifier || '')
+        .trim()
+        .slice(0, 60),
+      bayIdentifier: String(sessionData.bayIdentifier || '')
+        .trim()
+        .slice(0, 60),
+      landmarkNote: String(sessionData.landmarkNote || '')
+        .trim()
+        .slice(0, 280),
+      gpsCoords: sessionData.gpsCoords || null,
+      photoDataUrl: sessionData.photoDataUrl || null,
+      status: 'active',
+      parkedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    allSessions.push(newSession);
+    writeJsonStorage(STORAGE_KEYS.sessions, allSessions);
+
+    this.activeSession = computeSessionState(newSession, catalog.settings);
     this.notify();
     return this.activeSession;
   }
 
   async updateParkingSession(sessionId, updates) {
-    const endpoint = `${PARKING_CONFIG.sessionsUrl.replace(/\/$/, '')}/${encodeURIComponent(sessionId)}`;
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(updates),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(
-        payload.message || 'Could not update your saved parking location. Please try again.'
-      );
+    const user = authService.currentUser;
+    if (!user?.id) {
+      throw new Error('Authentication required.');
     }
 
-    this.activeSession = payload.session || null;
+    const catalog = this.loadCatalog();
+    const allSessions = readJsonStorage(STORAGE_KEYS.sessions, []);
+    const session = allSessions.find(
+      (s) => s.id === sessionId && s.userId === user.id && s.status === 'active'
+    );
+    if (!session) {
+      throw new Error('Active parking session not found.');
+    }
+
+    if (updates.sectionId && updates.sectionId !== session.sectionId) {
+      const nextSec = catalog.sections.find((s) => s.id === updates.sectionId);
+      if (!nextSec) {
+        throw new Error('Selected parking section is invalid.');
+      }
+      const nextType = updates.vehicleType
+        ? String(updates.vehicleType).toLowerCase()
+        : session.vehicleType;
+      if (!nextSec.vehicleTypes.includes(nextType)) {
+        throw new Error(
+          `Selected section (${nextSec.name}) does not support ${nextType} parking.`
+        );
+      }
+      const lot = catalog.lots.find((l) => l.id === nextSec.lotId);
+      session.lotId = nextSec.lotId;
+      session.lotName = lot ? lot.name : 'Campus Parking Lot';
+      session.sectionId = nextSec.id;
+      session.sectionCode = nextSec.code;
+      session.sectionName = nextSec.name;
+    }
+
+    if (
+      updates.vehicleType &&
+      ['bike', 'car', 'other'].includes(String(updates.vehicleType).toLowerCase())
+    ) {
+      session.vehicleType = String(updates.vehicleType).toLowerCase();
+    }
+    if (typeof updates.rowIdentifier === 'string') {
+      session.rowIdentifier = updates.rowIdentifier.trim().slice(0, 60);
+    }
+    if (typeof updates.bayIdentifier === 'string') {
+      session.bayIdentifier = updates.bayIdentifier.trim().slice(0, 60);
+    }
+    if (typeof updates.landmarkNote === 'string') {
+      session.landmarkNote = updates.landmarkNote.trim().slice(0, 280);
+    }
+    if (updates.gpsCoords !== undefined) {
+      session.gpsCoords = updates.gpsCoords;
+    }
+    if (updates.removePhoto) {
+      session.photoDataUrl = null;
+    } else if (updates.photoDataUrl) {
+      session.photoDataUrl = updates.photoDataUrl;
+    }
+
+    session.updatedAt = new Date().toISOString();
+    writeJsonStorage(STORAGE_KEYS.sessions, allSessions);
+
+    this.activeSession = computeSessionState(session, catalog.settings);
     this.notify();
     return this.activeSession;
   }
 
   async endParkingSession(sessionId) {
-    const endpoint = `${PARKING_CONFIG.sessionsUrl.replace(/\/$/, '')}/${encodeURIComponent(sessionId)}`;
-    const response = await fetch(endpoint, {
-      method: 'DELETE',
-      credentials: 'include',
-      headers: buildHeaders(),
-    });
+    const user = authService.currentUser;
+    if (!user?.id) {
+      throw new Error('Authentication required.');
+    }
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Could not clear your saved parking session.');
+    const allSessions = readJsonStorage(STORAGE_KEYS.sessions, []);
+    const session = allSessions.find(
+      (s) => s.id === sessionId && s.userId === user.id && s.status === 'active'
+    );
+    if (session) {
+      session.status = 'completed';
+      session.endedAt = new Date().toISOString();
+      writeJsonStorage(STORAGE_KEYS.sessions, allSessions);
     }
 
     this.activeSession = null;
@@ -439,158 +614,249 @@ class ParkingService {
   }
 
   async submitSectionReport({ sectionId, sectionName, issueType, description }) {
-    const endpoint = PARKING_CONFIG.reportsUrl.replace(/\/$/, '');
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ sectionId, sectionName, issueType, description }),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to submit report right now.');
+    const user = authService.currentUser;
+    if (!user?.id) {
+      throw new Error('Please log in to submit a section report.');
     }
 
-    return payload.report;
+    const catalog = this.loadCatalog();
+    const section = catalog.sections.find((s) => s.id === sectionId);
+    const reports = readJsonStorage(STORAGE_KEYS.reports, []);
+    const report = {
+      id: `rep_${Date.now()}`,
+      sectionId: section ? section.id : 'general',
+      sectionName: section ? section.name : String(sectionName || 'General Campus Lot'),
+      issueType: String(issueType || '').trim(),
+      description: String(description || '')
+        .trim()
+        .slice(0, 300),
+      reportedByUserId: user.id,
+      reportedByName: user.fullName,
+      status: 'pending_review',
+      verified: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    reports.unshift(report);
+    writeJsonStorage(STORAGE_KEYS.reports, reports);
+    return report;
   }
 
   // ---------------------------------------------------------------------------
-  // Staff Maintenance Operations (Protected by Server RBAC)
+  // Staff Maintenance Operations
   // ---------------------------------------------------------------------------
   async fetchStaffOverview() {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/overview`;
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      credentials: 'include',
-      headers: buildHeaders(),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to load staff maintenance controls.');
-    }
-    return payload;
+    const catalog = this.loadCatalog();
+    const reports = readJsonStorage(STORAGE_KEYS.reports, []);
+    const auditLogs = readJsonStorage(STORAGE_KEYS.auditLogs, []);
+    return {
+      lots: catalog.lots,
+      sections: catalog.sections.map((sec) => computeFreshnessState(sec, catalog.settings)),
+      reports: reports.slice(0, 50),
+      auditLogs: auditLogs.slice(0, 50),
+      settings: catalog.settings,
+    };
   }
 
   async createLot(lotData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/lots`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(lotData),
-    });
+    const user = authService.currentUser;
+    const catalog = this.loadCatalog();
+    const lot = {
+      id: `lot_${Date.now().toString(36)}`,
+      name: String(lotData.name || '').trim(),
+      description: String(lotData.description || '').trim(),
+      nearestDestinations: Array.isArray(lotData.nearestDestinations)
+        ? lotData.nearestDestinations
+        : ['Academic Block A'],
+      active: true,
+    };
+    catalog.lots.push(lot);
+    this.saveCatalog(catalog);
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to create parking lot.');
-    }
+    const logs = readJsonStorage(STORAGE_KEYS.auditLogs, []);
+    logs.unshift({
+      id: `aud_${Date.now()}`,
+      action: 'CREATE_LOT',
+      targetName: lot.name,
+      staffName: user?.fullName || 'Staff',
+      staffEmail: user?.email || '',
+      timestamp: new Date().toISOString(),
+      details: `Created parking lot "${lot.name}"`,
+    });
+    writeJsonStorage(STORAGE_KEYS.auditLogs, logs);
+
     await this.fetchParkingData();
-    return payload.lot;
+    return lot;
   }
 
   async updateLot(lotId, lotData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/lots/${encodeURIComponent(lotId)}`;
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(lotData),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to update parking lot.');
-    }
+    const catalog = this.loadCatalog();
+    const lot = catalog.lots.find((l) => l.id === lotId);
+    if (!lot) throw new Error('Parking lot not found.');
+    if (typeof lotData.name === 'string' && lotData.name.trim()) lot.name = lotData.name.trim();
+    if (typeof lotData.description === 'string') lot.description = lotData.description.trim();
+    if (typeof lotData.active === 'boolean') lot.active = lotData.active;
+    this.saveCatalog(catalog);
     await this.fetchParkingData();
-    return payload.lot;
+    return lot;
   }
 
   async createSection(sectionData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/sections`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(sectionData),
-    });
+    const user = authService.currentUser;
+    const catalog = this.loadCatalog();
+    const lot = catalog.lots.find((l) => l.id === sectionData.lotId);
+    if (!lot) throw new Error('Please select a valid parent parking lot.');
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to create parking section.');
-    }
+    const totalCapacity = Math.max(1, Number(sectionData.totalCapacity) || 50);
+    const availableSpots = Math.min(
+      totalCapacity,
+      Math.max(0, Number(sectionData.availableSpots ?? totalCapacity))
+    );
+    const section = {
+      id: `sec_${Date.now().toString(36)}`,
+      lotId: lot.id,
+      code: String(sectionData.code || '')
+        .trim()
+        .toUpperCase(),
+      name: String(sectionData.name || '').trim(),
+      vehicleTypes: Array.isArray(sectionData.vehicleTypes) ? sectionData.vehicleTypes : ['bike'],
+      destination: sectionData.destination || lot.nearestDestinations[0] || 'Academic Block A',
+      walkingMinutes: Math.max(1, Number(sectionData.walkingMinutes) || 3),
+      accessRule: sectionData.accessRule || 'general',
+      accessLabel: sectionData.accessLabel || 'Students & Staff',
+      totalCapacity,
+      availableSpots,
+      status: sectionData.status || 'Available',
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.fullName || 'Staff',
+      rows: Array.isArray(sectionData.rows) ? sectionData.rows : ['Row A', 'Row B', 'Row C'],
+      landmarkHint: String(sectionData.landmarkHint || '').trim() || `Located inside ${lot.name}`,
+    };
+
+    catalog.sections.push(section);
+    this.saveCatalog(catalog);
     await this.fetchParkingData();
-    return payload.section;
+    return section;
   }
 
   async updateSection(sectionId, sectionData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/sections/${encodeURIComponent(sectionId)}`;
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(sectionData),
-    });
+    const user = authService.currentUser;
+    const catalog = this.loadCatalog();
+    const section = catalog.sections.find((s) => s.id === sectionId);
+    if (!section) throw new Error('Parking section not found.');
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to update parking section.');
+    if (typeof sectionData.name === 'string' && sectionData.name.trim()) {
+      section.name = sectionData.name.trim();
     }
+    if (typeof sectionData.code === 'string' && sectionData.code.trim()) {
+      section.code = sectionData.code.trim().toUpperCase();
+    }
+    if (typeof sectionData.destination === 'string' && sectionData.destination.trim()) {
+      section.destination = sectionData.destination.trim();
+    }
+    if (sectionData.totalCapacity !== undefined) {
+      section.totalCapacity = Math.max(
+        1,
+        Number(sectionData.totalCapacity) || section.totalCapacity
+      );
+      section.availableSpots = Math.min(section.totalCapacity, section.availableSpots);
+    }
+    if (Array.isArray(sectionData.vehicleTypes) && sectionData.vehicleTypes.length > 0) {
+      section.vehicleTypes = sectionData.vehicleTypes;
+    }
+    if (sectionData.accessRule) {
+      section.accessRule = sectionData.accessRule;
+    }
+    if (typeof sectionData.landmarkHint === 'string') {
+      section.landmarkHint = sectionData.landmarkHint.trim();
+    }
+    section.updatedAt = new Date().toISOString();
+    section.updatedBy = user?.fullName || 'Staff';
+
+    this.saveCatalog(catalog);
     await this.fetchParkingData();
-    return payload.section;
+    return computeFreshnessState(section, catalog.settings);
   }
 
   async updateSectionStatus(sectionId, statusData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/sections/${encodeURIComponent(sectionId)}/status`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(statusData),
-    });
+    const user = authService.currentUser;
+    const catalog = this.loadCatalog();
+    const section = catalog.sections.find((s) => s.id === sectionId);
+    if (!section) throw new Error('Parking section not found.');
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to update section status.');
+    if (statusData.status) {
+      section.status = statusData.status;
     }
+    if (statusData.availableSpots !== undefined) {
+      section.availableSpots = Math.max(
+        0,
+        Math.min(section.totalCapacity, Number(statusData.availableSpots) || 0)
+      );
+    } else if (section.status === 'Full' || section.status === 'Closed') {
+      section.availableSpots = 0;
+    }
+    section.updatedAt = new Date().toISOString();
+    section.updatedBy = user?.fullName || 'Staff';
+    this.saveCatalog(catalog);
+
+    const auditEntry = {
+      id: `aud_${Date.now()}`,
+      action: 'UPDATE_SECTION_STATUS',
+      targetName: section.name,
+      staffName: user?.fullName || 'Staff',
+      staffEmail: user?.email || '',
+      timestamp: section.updatedAt,
+      details: `Set ${section.name} to ${section.status} (${section.availableSpots}/${section.totalCapacity} spots)`,
+    };
+    const logs = readJsonStorage(STORAGE_KEYS.auditLogs, []);
+    logs.unshift(auditEntry);
+    writeJsonStorage(STORAGE_KEYS.auditLogs, logs);
+
     await this.fetchParkingData();
-    return payload;
+    return {
+      section: computeFreshnessState(section, catalog.settings),
+      auditEntry,
+    };
   }
 
   async reviewReport(reportId, reviewData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/reports/${encodeURIComponent(reportId)}`;
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(reviewData),
-    });
+    const user = authService.currentUser;
+    const reports = readJsonStorage(STORAGE_KEYS.reports, []);
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) throw new Error('Report not found.');
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to update report status.');
+    report.status = reviewData.status === 'dismissed' ? 'dismissed' : 'verified';
+    report.verified = report.status === 'verified';
+    report.reviewedBy = user?.fullName || 'Staff';
+    report.reviewedAt = new Date().toISOString();
+    writeJsonStorage(STORAGE_KEYS.reports, reports);
+
+    if (report.verified && reviewData.applySectionStatus && report.sectionId !== 'general') {
+      await this.updateSectionStatus(report.sectionId, {
+        status: reviewData.applySectionStatus,
+      }).catch(() => {});
     }
-    return payload.report;
+    return report;
   }
 
   async updateStaffSettings(settingsData) {
-    const endpoint = `${PARKING_CONFIG.staffUrl.replace(/\/$/, '')}/settings`;
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(settingsData),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to update freshness settings.');
+    const catalog = this.loadCatalog();
+    if (settingsData.freshnessMinutes !== undefined) {
+      catalog.settings.freshnessMinutes = Math.max(
+        5,
+        Math.min(720, Number(settingsData.freshnessMinutes) || 60)
+      );
     }
+    if (settingsData.staleVehicleHours !== undefined) {
+      catalog.settings.staleVehicleHours = Math.max(
+        1,
+        Math.min(168, Number(settingsData.staleVehicleHours) || 12)
+      );
+    }
+    this.saveCatalog(catalog);
     await this.fetchParkingData();
-    return payload.settings;
+    return catalog.settings;
   }
 }
 
 export const parkingService = new ParkingService();
-

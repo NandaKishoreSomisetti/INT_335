@@ -1,28 +1,12 @@
 /**
  * Shared Persistent Reviews & Likes Service Layer (js/services/reviewService.js)
  *
- * Used by BOTH the public homepage Reviews section and the authenticated Reviews page
- * against the same persistent backend (`REVIEWS_CONFIG.baseUrl`).
- *
- * Responsibilities:
- * 1. Fetches, creates, edits, deletes, and likes reviews via `REVIEWS_CONFIG.baseUrl`.
- * 2. Enforces one review per account and author ownership on edit/delete.
- * 3. Consistently sorts reviews by `likeCount` descending, breaking ties by `createdAt`
- *    descending (newest first).
- * 4. Notifies all subscribed views so public and authenticated review feeds stay in sync.
+ * GitHub Pages & Static-Host Compatible:
+ * - Operates directly in the browser without calling `/api/reviews` POST/PUT/DELETE
+ *   endpoints that return 405 Method Not Allowed on GitHub Pages.
  */
 
-import { REVIEWS_CONFIG } from '../config.js?v=sb3';
-import { authService } from './authService.js?v=sb3';
-
-function buildHeaders(extra = {}) {
-  const headers = { Accept: 'application/json', ...extra };
-  const token = authService.getAccessToken?.();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-  return headers;
-}
+const REVIEWS_STORAGE_KEY = 'parktrace.reviews.v1';
 
 export class ReviewConfigurationError extends Error {
   constructor(message) {
@@ -32,12 +16,6 @@ export class ReviewConfigurationError extends Error {
   }
 }
 
-/**
- * Pure comparator for sorting reviews:
- * 1. Highest `likeCount` first.
- * 2. Newest `createdAt` timestamp first when `likeCount` is equal.
- * 3. Deterministic ID comparison if timestamps are identical.
- */
 export function sortReviews(reviews) {
   return [...reviews].sort((a, b) => {
     const likesA = Number(a.likeCount) || 0;
@@ -56,6 +34,25 @@ export function sortReviews(reviews) {
   });
 }
 
+function readStoredReviews() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(REVIEWS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredReviews(list) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
 class ReviewService {
   constructor() {
     this.reviews = [];
@@ -63,7 +60,7 @@ class ReviewService {
   }
 
   isConfigured() {
-    return Boolean(REVIEWS_CONFIG.baseUrl && REVIEWS_CONFIG.baseUrl.trim().length > 0);
+    return true;
   }
 
   subscribe(listener) {
@@ -84,6 +81,15 @@ class ReviewService {
   normalizeReview(item, currentUser = null) {
     const authorId = item.authorId ? String(item.authorId) : null;
     const currentUserId = currentUser?.id ? String(currentUser.id) : null;
+    const likedBy = Array.isArray(item.likedByUserIds) ? item.likedByUserIds : [];
+    const likeCount =
+      typeof item.likeCount === 'number' && !Array.isArray(item.likedByUserIds)
+        ? Math.max(0, item.likeCount)
+        : likedBy.length;
+    const likedByCurrentUser = currentUserId
+      ? likedBy.includes(currentUserId)
+      : Boolean(item.likedByCurrentUser);
+
     return {
       id: String(item.id),
       authorId,
@@ -91,47 +97,14 @@ class ReviewService {
       text: String(item.text || ''),
       createdAt: item.createdAt || new Date().toISOString(),
       updatedAt: item.updatedAt || null,
-      likeCount: Math.max(0, Number(item.likeCount) || 0),
-      likedByCurrentUser: Boolean(item.likedByCurrentUser),
-      isOwnReview:
-        typeof item.isOwnReview === 'boolean'
-          ? item.isOwnReview
-          : Boolean(currentUserId && authorId && currentUserId === authorId),
+      likeCount,
+      likedByCurrentUser,
+      isOwnReview: Boolean(currentUserId && authorId && currentUserId === authorId),
     };
   }
 
-  /**
-   * Fetches submitted reviews from the shared persistent backend.
-   * Distinguishes between an unavailable backend (`available: false`) and a confirmed
-   * empty response (`available: true, reviews: []`).
-   */
   async fetchReviews(currentUser = null) {
-    if (!this.isConfigured()) {
-      this.reviews = [];
-      return {
-        reviews: [],
-        configured: false,
-        available: false,
-      };
-    }
-
-    const response = await fetch(REVIEWS_CONFIG.baseUrl.replace(/\/$/, ''), {
-      method: 'GET',
-      credentials: 'include',
-      headers: buildHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error('Reviews are temporarily unavailable.');
-    }
-
-    const data = await response.json();
-    const rawList = Array.isArray(data)
-      ? data
-      : Array.isArray(data.reviews)
-      ? data.reviews
-      : [];
-
+    const rawList = readStoredReviews();
     this.reviews = sortReviews(
       rawList.map((item) => this.normalizeReview(item, currentUser))
     );
@@ -144,9 +117,6 @@ class ReviewService {
     };
   }
 
-  /**
-   * Submits a new review for an authenticated user (one review per account).
-   */
   async createReview({ text, user }) {
     if (!user) {
       throw new Error('Please log in to submit a review.');
@@ -160,51 +130,33 @@ class ReviewService {
       throw new Error('Review text must be 400 characters or fewer.');
     }
 
-    if (!this.isConfigured()) {
-      throw new ReviewConfigurationError(
-        'Reviews are temporarily unavailable. Your review could not be saved.'
-      );
-    }
-
-    const response = await fetch(REVIEWS_CONFIG.baseUrl.replace(/\/$/, ''), {
-      method: 'POST',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        text: cleanText,
-      }),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    const rawList = readStoredReviews();
+    const existing = rawList.find((r) => String(r.authorId) === String(user.id));
+    if (existing) {
       throw new Error(
-        payload.message || 'Reviews are temporarily unavailable. Please try again later.'
+        'You have already submitted a review. You can edit or delete your existing review.'
       );
     }
 
-    const saved = payload.review || payload;
-    const normalized = this.normalizeReview(
-      {
-        ...saved,
-        authorId: saved.authorId || user.id,
-        authorName: saved.authorName || user.fullName || 'Campus Member',
-        text: saved.text || cleanText,
-        isOwnReview: true,
-      },
-      user
-    );
+    const newRecord = {
+      id: `rev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      authorId: String(user.id),
+      authorName: user.fullName || 'Campus Member',
+      text: cleanText,
+      createdAt: new Date().toISOString(),
+      updatedAt: null,
+      likedByUserIds: [],
+    };
 
-    this.reviews = sortReviews([
-      normalized,
-      ...this.reviews.filter((r) => String(r.id) !== String(normalized.id)),
-    ]);
+    rawList.unshift(newRecord);
+    writeStoredReviews(rawList);
+
+    const normalized = this.normalizeReview(newRecord, user);
+    this.reviews = sortReviews(rawList.map((r) => this.normalizeReview(r, user)));
     this.notify();
     return normalized;
   }
 
-  /**
-   * Updates an existing review owned by the authenticated user.
-   */
   async updateReview({ reviewId, text, user }) {
     if (!user) {
       throw new Error('Please log in to edit your review.');
@@ -218,120 +170,81 @@ class ReviewService {
       throw new Error('Review text must be 400 characters or fewer.');
     }
 
-    if (!this.isConfigured()) {
-      throw new ReviewConfigurationError(
-        'Reviews are temporarily unavailable. Your changes could not be saved.'
-      );
+    const rawList = readStoredReviews();
+    const item = rawList.find((r) => String(r.id) === String(reviewId));
+    if (!item) {
+      throw new Error('Review not found.');
+    }
+    if (String(item.authorId) !== String(user.id)) {
+      throw new Error('You can only edit or delete your own review.');
     }
 
-    const endpoint = `${REVIEWS_CONFIG.baseUrl.replace(/\/$/, '')}/${encodeURIComponent(reviewId)}`;
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ text: cleanText }),
-    });
+    item.text = cleanText;
+    item.authorName = user.fullName || item.authorName;
+    item.updatedAt = new Date().toISOString();
+    writeStoredReviews(rawList);
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to update your review right now.');
-    }
-
-    const saved = payload.review || payload;
-    const normalized = this.normalizeReview(saved, user);
-
-    this.reviews = sortReviews(
-      this.reviews.map((r) => (String(r.id) === String(reviewId) ? normalized : r))
-    );
+    const normalized = this.normalizeReview(item, user);
+    this.reviews = sortReviews(rawList.map((r) => this.normalizeReview(r, user)));
     this.notify();
     return normalized;
   }
 
-  /**
-   * Deletes an existing review owned by the authenticated user.
-   */
   async deleteReview({ reviewId, user }) {
     if (!user) {
       throw new Error('Please log in to delete your review.');
     }
 
-    if (!this.isConfigured()) {
-      throw new ReviewConfigurationError(
-        'Reviews are temporarily unavailable. Your review could not be deleted.'
-      );
+    const rawList = readStoredReviews();
+    const idx = rawList.findIndex((r) => String(r.id) === String(reviewId));
+    if (idx === -1) {
+      throw new Error('Review not found.');
+    }
+    if (String(rawList[idx].authorId) !== String(user.id)) {
+      throw new Error('You can only edit or delete your own review.');
     }
 
-    const endpoint = `${REVIEWS_CONFIG.baseUrl.replace(/\/$/, '')}/${encodeURIComponent(reviewId)}`;
-    const response = await fetch(endpoint, {
-      method: 'DELETE',
-      credentials: 'include',
-      headers: buildHeaders(),
-    });
+    rawList.splice(idx, 1);
+    writeStoredReviews(rawList);
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Unable to delete your review right now.');
-    }
-
-    this.reviews = sortReviews(
-      this.reviews.filter((r) => String(r.id) !== String(reviewId))
-    );
+    this.reviews = sortReviews(rawList.map((r) => this.normalizeReview(r, user)));
     this.notify();
     return { ok: true, id: String(reviewId) };
   }
 
-  /**
-   * Toggles the current authenticated user's like on a specific review.
-   * Server enforces one unique like per authenticated user per review.
-   */
   async toggleLike({ reviewId, shouldLike, user }) {
     if (!user) {
       throw new Error('Log in to like reviews.');
     }
 
-    if (!this.isConfigured()) {
-      throw new ReviewConfigurationError(
-        'Reviews are temporarily unavailable. Your like could not be saved.'
-      );
+    const rawList = readStoredReviews();
+    const item = rawList.find((r) => String(r.id) === String(reviewId));
+    if (!item) {
+      throw new Error('Review not found.');
     }
 
-    const endpoint = `${REVIEWS_CONFIG.baseUrl.replace(/\/$/, '')}/${encodeURIComponent(reviewId)}/likes`;
-    const response = await fetch(endpoint, {
-      method: shouldLike ? 'POST' : 'DELETE',
-      credentials: 'include',
-      headers: buildHeaders(),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || 'Could not update your like right now.');
+    if (!Array.isArray(item.likedByUserIds)) {
+      item.likedByUserIds = [];
     }
 
-    const result = {
+    const userId = String(user.id);
+    const hasLiked = item.likedByUserIds.includes(userId);
+    if (shouldLike && !hasLiked) {
+      item.likedByUserIds.push(userId);
+    } else if (!shouldLike && hasLiked) {
+      item.likedByUserIds = item.likedByUserIds.filter((id) => id !== userId);
+    }
+
+    writeStoredReviews(rawList);
+
+    this.reviews = sortReviews(rawList.map((r) => this.normalizeReview(r, user)));
+    this.notify();
+
+    return {
       id: String(reviewId),
-      likeCount:
-        typeof payload.likeCount === 'number' ? Math.max(0, payload.likeCount) : undefined,
-      likedByCurrentUser:
-        typeof payload.likedByCurrentUser === 'boolean'
-          ? payload.likedByCurrentUser
-          : shouldLike,
+      likeCount: item.likedByUserIds.length,
+      likedByCurrentUser: item.likedByUserIds.includes(userId),
     };
-
-    const idx = this.reviews.findIndex((r) => String(r.id) === String(reviewId));
-    if (idx !== -1) {
-      this.reviews[idx] = {
-        ...this.reviews[idx],
-        likedByCurrentUser: result.likedByCurrentUser,
-        likeCount:
-          typeof result.likeCount === 'number'
-            ? result.likeCount
-            : this.reviews[idx].likeCount,
-      };
-      this.reviews = sortReviews(this.reviews);
-      this.notify();
-    }
-
-    return result;
   }
 }
 

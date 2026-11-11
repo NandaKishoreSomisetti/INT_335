@@ -1,23 +1,28 @@
 /**
  * Supabase Client Initialization Module (js/services/supabaseClient.js)
  *
- * Initializes and exports the `@supabase/supabase-js` client using:
- * - `NEXT_PUBLIC_SUPABASE_URL`
- * - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
- *
- * Validates that both variables are non-empty strings before calling
- * `createClient(supabaseUrl, supabaseAnonKey)`.
+ * Initializes and exports `supabase` directly for GitHub Pages and browser ES modules
+ * using `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb3';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb5';
 
-let supabaseInstance = null;
-let createClientFn = null;
+const supabaseUrl = SUPABASE_CONFIG?.url;
+const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;
+
+if (
+  typeof supabaseUrl !== 'string' ||
+  supabaseUrl.trim().length === 0 ||
+  typeof supabaseAnonKey !== 'string' ||
+  supabaseAnonKey.trim().length === 0
+) {
+  console.warn('Supabase URL or Anon Key is missing from environment variables');
+}
 
 /**
  * Adaptive storage adapter for Supabase Auth in the browser.
  * Routes session tokens to `localStorage` when "Remember me" is enabled (default)
- * or `sessionStorage` when "Remember me" is unchecked, while never storing raw passwords.
+ * or `sessionStorage` when "Remember me" is unchecked.
  */
 const adaptiveBrowserStorage = {
   getItem(key) {
@@ -61,49 +66,30 @@ const adaptiveBrowserStorage = {
   },
 };
 
-/**
- * Resolves `createClient` from `@supabase/supabase-js` across Browser and Node environments.
- */
-async function resolveCreateClient() {
-  if (createClientFn) return createClientFn;
-
+function initSyncSupabaseClient() {
   if (typeof window !== 'undefined' && window.supabase?.createClient) {
-    createClientFn = window.supabase.createClient;
-    return createClientFn;
+    return window.supabase.createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
+      auth: {
+        storageKey: STORAGE_KEYS.supabaseAuthToken,
+        storage: adaptiveBrowserStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
   }
-
-  if (typeof window !== 'undefined') {
-    try {
-      const mod = await import('/vendor/supabase.js');
-      createClientFn = mod.createClient || window.supabase?.createClient;
-      if (createClientFn) return createClientFn;
-    } catch {
-      try {
-        const cdnMod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-        createClientFn = cdnMod.createClient;
-        if (createClientFn) return createClientFn;
-      } catch {
-        // Fallback to bare specifier
-      }
-    }
-  }
-
-  const pkgName = '@supabase/supabase-js';
-  const nodeMod = await import(pkgName);
-  createClientFn = nodeMod.createClient;
-  return createClientFn;
+  return null;
 }
 
+export let supabase = initSyncSupabaseClient();
+
 /**
- * Validates environment variables and returns the singleton Supabase client instance.
+ * Returns the initialized Supabase client instance (resolving via ESM CDN if needed).
  */
 export async function getSupabaseClient() {
-  if (supabaseInstance) {
-    return supabaseInstance;
+  if (supabase) {
+    return supabase;
   }
-
-  const supabaseUrl = SUPABASE_CONFIG?.url;
-  const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;
 
   if (
     typeof supabaseUrl !== 'string' ||
@@ -115,10 +101,24 @@ export async function getSupabaseClient() {
     throw new Error('Supabase URL or Anon Key is missing from environment variables');
   }
 
-  const createClient = await resolveCreateClient();
-  const isBrowser = typeof window !== 'undefined';
+  let createClient =
+    typeof window !== 'undefined' && window.supabase?.createClient
+      ? window.supabase.createClient
+      : null;
 
-  supabaseInstance = createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
+  if (!createClient && typeof window !== 'undefined') {
+    const cdnMod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    createClient = cdnMod.createClient;
+  }
+
+  if (!createClient) {
+    const pkgName = '@supabase/supabase-js';
+    const nodeMod = await import(pkgName);
+    createClient = nodeMod.createClient;
+  }
+
+  const isBrowser = typeof window !== 'undefined';
+  supabase = createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
     auth: {
       storageKey: STORAGE_KEYS.supabaseAuthToken,
       storage: isBrowser ? adaptiveBrowserStorage : undefined,
@@ -128,7 +128,7 @@ export async function getSupabaseClient() {
     },
   });
 
-  return supabaseInstance;
+  return supabase;
 }
 
 export { SUPABASE_CONFIG };

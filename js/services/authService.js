@@ -1,18 +1,16 @@
 /**
- * Authentication, Session & Profile Service Layer (js/services/authService.js)
+ * Direct Supabase Authentication & Profile Service (js/services/authService.js)
  *
- * Powered by Supabase Auth (`@supabase/supabase-js`):
- * 1. Sign Up: Registers users exclusively via `supabase.auth.signUp({ email, password, options: { data } })`,
- *    logs `console.error('Supabase signup error:', error)` on failure, and surfaces `error.message` directly.
- * 2. Sign In: Authenticates via `supabase.auth.signInWithPassword({ email, password })`,
- *    immediately stores the user in client state upon `data.session`, and routes to the main dashboard.
- * 3. Sign Out & Reactive Session Management: `supabase.auth.signOut()` and `supabase.auth.onAuthStateChange()`.
- * 4. Profile Synchronization: Relies on the Supabase SQL trigger (`on_auth_user_created`) on signup
- *    and guards any `public.profiles` reads/updates behind an active authenticated session.
+ * Designed for static hosting (GitHub Pages) and local browser environments:
+ * - Zero `fetch('/api/auth/...')` calls (eliminates 405 Method Not Allowed on GitHub Pages).
+ * - Communicates directly with Supabase using `supabase.auth.signInWithPassword`,
+ *   `supabase.auth.signUp`, `supabase.auth.getSession`, `supabase.auth.signOut`,
+ *   and `supabase.auth.onAuthStateChange`.
+ * - Includes one-click `demoLogin()` ("⚡ Quick Demo Login") with resilient local fallback.
  */
 
-import { AUTH_CONFIG, SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb3';
-import { getSupabaseClient } from './supabaseClient.js?v=sb3';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb5';
+import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb5';
 
 export class AuthConfigurationError extends Error {
   constructor(message) {
@@ -26,6 +24,7 @@ const ALLOWED_AVATAR_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
 const STAFF_EMAIL_SET = new Set(['parktrace.1341@gmail.com']);
 const FALLBACK_USER_STORAGE_KEY = 'parktrace.active_user_profile';
+const LOCAL_PROFILE_EXTRAS_PREFIX = 'parktrace.profile_extras.';
 
 class AuthService {
   constructor() {
@@ -36,12 +35,12 @@ class AuthService {
     this.intendedDestination = null;
     this.authSubscriptionInitialized = false;
     this.ignoreNextAuthEvent = false;
-    this.avatarMemoryCache = new Map();
   }
 
-  /**
-   * Returns true when a valid Supabase configuration is present.
-   */
+  async resolveClient() {
+    return initialSupabase || (await getSupabaseClient());
+  }
+
   isConfigured() {
     const supabaseUrl = SUPABASE_CONFIG?.url;
     const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;
@@ -57,31 +56,19 @@ class AuthService {
     return true;
   }
 
-  /**
-   * Returns true if a user is currently authenticated.
-   */
   isAuthenticated() {
     return Boolean(this.currentUser && this.currentUser.id);
   }
 
-  /**
-   * Returns the active Supabase JWT access token (if signed in).
-   */
   getAccessToken() {
     return this.accessToken || null;
   }
 
-  /**
-   * Subscribe to session state changes (`currentUser`).
-   */
   subscribe(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  /**
-   * Register a callback invoked during `logout()` to purge sensitive in-memory state.
-   */
   onClearAccountCache(callback) {
     this.cacheClearCallbacks.add(callback);
     return () => this.cacheClearCallbacks.delete(callback);
@@ -182,8 +169,30 @@ class AuthService {
     }
   }
 
+  saveLocalProfileExtras(userId, extras) {
+    if (typeof window === 'undefined' || !userId) return;
+    try {
+      window.localStorage?.setItem(
+        `${LOCAL_PROFILE_EXTRAS_PREFIX}${userId}`,
+        JSON.stringify(extras)
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+  }
+
+  loadLocalProfileExtras(userId) {
+    if (typeof window === 'undefined' || !userId) return null;
+    try {
+      const raw = window.localStorage?.getItem(`${LOCAL_PROFILE_EXTRAS_PREFIX}${userId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  // User Normalization & Guarded Profile Hydration
+  // User Normalization
   // ---------------------------------------------------------------------------
   deriveDefaultRole(email, existingRole) {
     if (existingRole === 'staff' || existingRole === 'admin') {
@@ -198,8 +207,10 @@ class AuthService {
 
     const userId = String(supabaseUser.id);
     const meta = supabaseUser.user_metadata || {};
+    const localExtras = this.loadLocalProfileExtras(userId) || {};
+
     const email = String(
-      overrides.email || profileRow?.email || supabaseUser.email || ''
+      overrides.email || profileRow?.email || supabaseUser.email || localExtras.email || ''
     )
       .trim()
       .toLowerCase();
@@ -208,6 +219,7 @@ class AuthService {
       String(
         overrides.fullName ||
           profileRow?.full_name ||
+          localExtras.fullName ||
           meta.full_name ||
           meta.fullName ||
           meta.name ||
@@ -215,13 +227,16 @@ class AuthService {
           'Campus Member'
       ).trim() || 'Campus Member';
 
-    // Authorization role ('member' | 'staff') is strictly separate from campusAffiliation
     const role = this.deriveDefaultRole(email, profileRow?.role || meta.role);
 
     const rawAffiliation =
       overrides.campusAffiliation !== undefined
         ? overrides.campusAffiliation
-        : profileRow?.campus_affiliation ?? meta.campus_affiliation ?? meta.campusAffiliation ?? null;
+        : profileRow?.campus_affiliation ??
+          localExtras.campusAffiliation ??
+          meta.campus_affiliation ??
+          meta.campusAffiliation ??
+          null;
     const campusAffiliation =
       rawAffiliation === 'student' || rawAffiliation === 'staff' ? rawAffiliation : null;
 
@@ -230,15 +245,11 @@ class AuthService {
         ? overrides.avatarUrl
         : profileRow?.avatar_url !== undefined
         ? profileRow.avatar_url
-        : this.avatarMemoryCache.has(userId)
-        ? this.avatarMemoryCache.get(userId)
+        : localExtras.avatarUrl !== undefined
+        ? localExtras.avatarUrl
         : meta.avatar_url !== undefined
         ? meta.avatar_url
         : null;
-
-    if (meta.has_avatar === false && overrides.avatarUrl === undefined) {
-      avatarUrl = profileRow?.avatar_url ?? null;
-    }
 
     const hasProfilePhoto = Boolean(avatarUrl && String(avatarUrl).trim().length > 0);
     const rememberPref = this.getRememberMePreference();
@@ -253,82 +264,24 @@ class AuthService {
       profilePhotoUrl: hasProfilePhoto ? String(avatarUrl) : null,
       emailVerified: Boolean(supabaseUser.email_confirmed_at || supabaseUser.confirmed_at || true),
       persistence: rememberPref ? 'persistent' : 'session',
+      isDemo: Boolean(overrides.isDemo || supabaseUser.isDemo || userId === 'demo-user-12345'),
       updatedAt: profileRow?.updated_at || supabaseUser.updated_at || new Date().toISOString(),
     };
   }
 
-  /**
-   * Strictly guarded profile fetch: ONLY queries `public.profiles` when an active
-   * authenticated `session.access_token` is present, and never throws or blocks auth.
-   */
-  async fetchProfileWhenAuthenticated(supabase, session, overrides = {}) {
-    if (!supabase || !session?.access_token || !session?.user?.id) {
-      return this.normalizeUser(session?.user, null, overrides);
-    }
-
-    let profileRow = null;
-    try {
-      const { data: existingProfile, error: selectError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, campus_affiliation, avatar_url, updated_at')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      if (!selectError && existingProfile) {
-        profileRow = existingProfile;
-        if (existingProfile.avatar_url) {
-          this.avatarMemoryCache.set(String(session.user.id), existingProfile.avatar_url);
-        }
-      }
-    } catch {
-      // Never fail login/signup if public.profiles is not yet migrated
-    }
-
-    return this.normalizeUser(session.user, profileRow, overrides);
-  }
-
-  /**
-   * Optional non-blocking bridge to the local Node server (`/api/auth/session`).
-   */
-  async syncServerSessionBridge(session, userProfile = null) {
-    if (typeof fetch === 'undefined' || !session?.access_token) return null;
-    try {
-      const endpoint = `${AUTH_CONFIG.baseUrl.replace(/\/$/, '')}${AUTH_CONFIG.endpoints.session}`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          accessToken: session.access_token,
-          rememberMe: this.getRememberMePreference(),
-          profile: userProfile,
-        }),
-      });
-      if (res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        return payload?.user || null;
-      }
-    } catch {
-      // Non-fatal on static hosts (e.g., GitHub Pages)
-    }
-    return null;
-  }
-
-  /**
-   * Initializes the reactive `supabase.auth.onAuthStateChange` listener once.
-   */
   async ensureAuthStateListener() {
     if (this.authSubscriptionInitialized) return;
     this.authSubscriptionInitialized = true;
 
     try {
-      const supabase = await getSupabaseClient();
-      supabase.auth.onAuthStateChange(async (event, session) => {
+      const supabase = await this.resolveClient();
+      supabase.auth.onAuthStateChange((event, session) => {
         if (this.ignoreNextAuthEvent) return;
+
+        // Keep active demo user session intact unless explicitly logged out
+        if (this.currentUser?.isDemo || this.currentUser?.id === 'demo-user-12345') {
+          return;
+        }
 
         if (event === 'SIGNED_OUT') {
           this.accessToken = null;
@@ -348,23 +301,13 @@ class AuthService {
             event === 'INITIAL_SESSION')
         ) {
           this.accessToken = session.access_token || null;
-          const immediateUser = this.normalizeUser(session.user);
-          if (!this.currentUser) {
-            this.currentUser = immediateUser;
-            this.saveCachedUserProfile(immediateUser);
+          const normalized = this.normalizeUser(session.user);
+          const prevJson = JSON.stringify(this.currentUser);
+          const nextJson = JSON.stringify(normalized);
+          this.currentUser = normalized;
+          this.saveCachedUserProfile(normalized);
+          if (prevJson !== nextJson) {
             this.notify();
-          }
-
-          const hydratedUser = await this.fetchProfileWhenAuthenticated(supabase, session);
-          if (hydratedUser) {
-            const prevJson = JSON.stringify(this.currentUser);
-            const nextJson = JSON.stringify(hydratedUser);
-            this.currentUser = hydratedUser;
-            this.saveCachedUserProfile(hydratedUser);
-            this.syncServerSessionBridge(session, hydratedUser).catch(() => {});
-            if (prevJson !== nextJson) {
-              this.notify();
-            }
           }
         }
       });
@@ -374,8 +317,20 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Session Restoration (`restoreSession`)
+  // Direct Supabase Session Check (`getSession` / `getCurrentUser` / `restoreSession`)
   // ---------------------------------------------------------------------------
+  async getSession() {
+    const supabase = await this.resolveClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return session?.user || null;
+  }
+
+  async getCurrentUser() {
+    return this.getSession();
+  }
+
   async restoreSession() {
     if (!this.isConfigured()) {
       return null;
@@ -384,28 +339,17 @@ class AuthService {
     await this.ensureAuthStateListener();
 
     try {
-      const supabase = await getSupabaseClient();
-      const { data, error } = await supabase.auth.getSession();
+      const supabase = await this.resolveClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!error && data?.session?.user) {
-        this.accessToken = data.session.access_token || null;
-        const immediateUser = this.normalizeUser(data.session.user);
-        this.currentUser = immediateUser;
-        this.saveCachedUserProfile(immediateUser);
+      if (session?.user) {
+        this.accessToken = session.access_token || null;
+        const user = this.normalizeUser(session.user);
+        this.currentUser = user;
+        this.saveCachedUserProfile(user);
         this.notify();
-
-        // Hydrate any additional profile fields without blocking UI routing
-        this.fetchProfileWhenAuthenticated(supabase, data.session)
-          .then((hydrated) => {
-            if (hydrated && this.currentUser?.id === hydrated.id) {
-              this.currentUser = hydrated;
-              this.saveCachedUserProfile(hydrated);
-              this.syncServerSessionBridge(data.session, hydrated).catch(() => {});
-              this.notify();
-            }
-          })
-          .catch(() => {});
-
         return this.currentUser;
       }
 
@@ -434,68 +378,35 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Sign In (`supabase.auth.signInWithPassword`)
+  // Direct Supabase Sign In (`login`)
+  // Supports both `login({ email, password, rememberMe })` and `login(email, password)`
   // ---------------------------------------------------------------------------
-  async login({ email, password, rememberMe }) {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    this.applyRememberMePolicy(cleanEmail, rememberMe);
+  async login(emailOrOptions, maybePassword) {
+    const isObjectArg = typeof emailOrOptions === 'object' && emailOrOptions !== null;
+    const rawEmail = isObjectArg ? emailOrOptions.email : emailOrOptions;
+    const password = isObjectArg ? emailOrOptions.password : maybePassword;
+    const rememberMe = isObjectArg ? Boolean(emailOrOptions.rememberMe ?? true) : true;
 
-    if (!this.isConfigured()) {
-      throw new AuthConfigurationError(
-        'Supabase URL or Anon Key is missing from environment variables'
-      );
-    }
+    const email = String(rawEmail || '').trim().toLowerCase();
+    this.applyRememberMePolicy(email, rememberMe);
 
+    const supabase = await this.resolveClient();
     await this.ensureAuthStateListener();
-    const supabase = await getSupabaseClient();
 
     this.ignoreNextAuthEvent = true;
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         console.error('Auth error details:', error);
-        const authErr = new Error(error.message);
-        authErr.code = error.code;
-        authErr.status = error.status;
-        throw authErr;
+        throw error;
       }
 
-      if (data?.session) {
-        this.accessToken = data.session.access_token || null;
-        // Immediately store user in client state and route to main dashboard
-        const immediateUser = this.normalizeUser(data.session.user || data.user);
-        this.currentUser = immediateUser;
-        this.saveCachedUserProfile(immediateUser);
-        this.notify();
-
-        // Non-blocking profile hydration & server session sync
-        this.fetchProfileWhenAuthenticated(supabase, data.session)
-          .then((hydratedUser) => {
-            if (hydratedUser && this.currentUser?.id === hydratedUser.id) {
-              this.currentUser = hydratedUser;
-              this.saveCachedUserProfile(hydratedUser);
-              this.syncServerSessionBridge(data.session, hydratedUser).catch(() => {});
-              this.notify();
-            }
-          })
-          .catch(() => {});
-
-        return this.currentUser;
-      }
-
-      if (data?.user) {
-        const fallbackUser = this.normalizeUser(data.user);
-        this.currentUser = fallbackUser;
-        this.saveCachedUserProfile(fallbackUser);
-        this.notify();
-        return this.currentUser;
-      }
-
-      throw new Error('Authentication failed: no session returned.');
+      this.accessToken = data?.session?.access_token || null;
+      const normalized = this.normalizeUser(data.user || data?.session?.user);
+      this.currentUser = normalized;
+      this.saveCachedUserProfile(normalized);
+      this.notify();
+      return data.user;
     } catch (error) {
       console.error('Auth error details:', error);
       throw error;
@@ -505,49 +416,28 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Sign Up (`supabase.auth.signUp`)
+  // Direct Supabase Sign Up (`signup` / `signUp`)
+  // Supports both `signUp({ fullName, email, password })` and `signup(email, password, metadata)`
   // ---------------------------------------------------------------------------
-  async signUp({ fullName, email, password }) {
-    const cleanName = (fullName || '').trim();
-    const cleanEmail = (email || '').trim().toLowerCase();
+  async signup(email, password, metadata = {}) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanName = String(metadata?.full_name || metadata?.fullName || '').trim();
 
-    if (!cleanName || cleanName.length < 2) {
-      throw new Error('Please enter your full name (at least 2 characters).');
-    }
-
-    if (!this.isConfigured()) {
-      throw new AuthConfigurationError(
-        'Supabase URL or Anon Key is missing from environment variables'
-      );
-    }
-
+    const supabase = await this.resolveClient();
     await this.ensureAuthStateListener();
-    const supabase = await getSupabaseClient();
 
     this.ignoreNextAuthEvent = true;
     try {
-      // Register user exclusively through supabase.auth.signUp (never manually hash or insert passwords)
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
-        options: {
-          data: {
-            full_name: cleanName,
-            fullName: cleanName,
-            campus_affiliation: null,
-          },
-        },
+        options: { data: metadata },
       });
-
       if (error) {
         console.error('Auth error details:', error);
-        const signUpErr = new Error(error.message);
-        signUpErr.code = error.code;
-        signUpErr.status = error.status;
-        throw signUpErr;
+        throw error;
       }
 
-      // Detect duplicate user when Supabase obfuscates existing email addresses
       if (
         data?.user &&
         Array.isArray(data.user.identities) &&
@@ -558,33 +448,25 @@ class AuthService {
         throw dupError;
       }
 
-      // Auto-login on Sign Up when a session is returned (`data.session`)
       if (data?.session) {
         this.accessToken = data.session.access_token || null;
-        const immediateUser = this.normalizeUser(data.session.user || data.user, null, {
-          fullName: cleanName,
-        });
-        this.currentUser = immediateUser;
-        this.saveCachedUserProfile(immediateUser);
-        this.notify();
-
-        this.syncServerSessionBridge(data.session, immediateUser).catch(() => {});
-        return this.currentUser;
       }
 
-      // If user record is returned without an active session (e.g. email confirmation enabled),
-      // auto-transition to the dashboard so the user is not forced to re-enter credentials
       if (data?.user) {
-        const createdUser = this.normalizeUser(data.user, null, { fullName: cleanName });
-        this.currentUser = createdUser;
-        this.saveCachedUserProfile(createdUser);
+        this.saveLocalProfileExtras(data.user.id, {
+          email: cleanEmail,
+          fullName: cleanName || cleanEmail.split('@')[0],
+          campusAffiliation: null,
+        });
+        const normalized = this.normalizeUser(data.user, null, {
+          fullName: cleanName || cleanEmail.split('@')[0],
+        });
+        this.currentUser = normalized;
+        this.saveCachedUserProfile(normalized);
         this.notify();
-        return this.currentUser;
       }
 
-      const unknownErr = new Error('Sign up completed without returning a user session.');
-      console.error('Auth error details:', unknownErr);
-      throw unknownErr;
+      return data.user;
     } catch (error) {
       console.error('Auth error details:', error);
       throw error;
@@ -593,8 +475,73 @@ class AuthService {
     }
   }
 
+  async signUp(optionsOrEmail, maybePassword, maybeMetadata) {
+    if (typeof optionsOrEmail === 'object' && optionsOrEmail !== null) {
+      const cleanName = String(optionsOrEmail.fullName || '').trim();
+      if (!cleanName || cleanName.length < 2) {
+        throw new Error('Please enter your full name (at least 2 characters).');
+      }
+      return this.signup(optionsOrEmail.email, optionsOrEmail.password, {
+        full_name: cleanName,
+        fullName: cleanName,
+        campus_affiliation: null,
+      });
+    }
+    return this.signup(optionsOrEmail, maybePassword, maybeMetadata);
+  }
+
   // ---------------------------------------------------------------------------
-  // Profile Update (`public.profiles` + `supabase.auth.updateUser`)
+  // Quick Demo Login (`demoLogin`)
+  // ---------------------------------------------------------------------------
+  async demoLogin() {
+    this.ignoreNextAuthEvent = true;
+    try {
+      if (this.isConfigured()) {
+        try {
+          const supabase = await this.resolveClient();
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: 'demo@example.com',
+            password: 'Demo@12345',
+          });
+
+          if (!error && data?.user) {
+            this.accessToken = data?.session?.access_token || null;
+            const liveDemoUser = this.normalizeUser(data.user, null, { isDemo: true });
+            this.currentUser = liveDemoUser;
+            this.saveCachedUserProfile(liveDemoUser);
+            this.notify();
+            return this.currentUser;
+          }
+        } catch {
+          // Fall through to local fallback demo session if Supabase rejects demo credentials
+        }
+      }
+
+      const demoUser = {
+        id: 'demo-user-12345',
+        email: 'demo@example.com',
+        user_metadata: { full_name: 'Demo User' },
+        role: 'authenticated',
+      };
+
+      const normalizedDemo = this.normalizeUser(demoUser, null, {
+        fullName: 'Demo User',
+        email: 'demo@example.com',
+        isDemo: true,
+      });
+
+      this.accessToken = null;
+      this.currentUser = normalizedDemo;
+      this.saveCachedUserProfile(normalizedDemo);
+      this.notify();
+      return this.currentUser;
+    } finally {
+      this.ignoreNextAuthEvent = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Direct Profile Update (`updateProfile` — zero `/api` calls)
   // ---------------------------------------------------------------------------
   async updateProfile({ fullName, campusAffiliation, avatarDataUrl, removeAvatar }) {
     if (!this.currentUser) {
@@ -624,7 +571,6 @@ class AuthService {
     let nextAvatarUrl = this.currentUser.profilePhotoUrl ?? null;
     if (Boolean(removeAvatar)) {
       nextAvatarUrl = null;
-      this.avatarMemoryCache.delete(this.currentUser.id);
     } else if (avatarDataUrl !== undefined && avatarDataUrl !== null && avatarDataUrl !== '') {
       const match = String(avatarDataUrl).match(
         /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/
@@ -641,125 +587,86 @@ class AuthService {
         throw new Error('Profile photo exceeds the 5 MB size limit. Please choose a smaller image.');
       }
       nextAvatarUrl = String(avatarDataUrl);
-      this.avatarMemoryCache.set(this.currentUser.id, nextAvatarUrl);
     }
 
-    const supabase = await getSupabaseClient();
     const nowIso = new Date().toISOString();
-    const { data: sessionData } = await supabase.auth.getSession();
-    const activeSession = sessionData?.session || null;
+    this.saveLocalProfileExtras(this.currentUser.id, {
+      email: this.currentUser.email,
+      fullName: cleanName,
+      campusAffiliation: normalizedAffiliation,
+      avatarUrl: nextAvatarUrl,
+      updatedAt: nowIso,
+    });
 
-    // 1. Guarded upsert into `public.profiles` ONLY when an active authenticated session exists
-    let updatedProfileRow = null;
-    if (activeSession?.access_token && activeSession?.user?.id) {
+    if (!this.currentUser.isDemo && this.isConfigured()) {
       try {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .upsert(
-            {
-              id: activeSession.user.id,
-              email: this.currentUser.email,
-              full_name: cleanName,
-              role: this.currentUser.role || 'member',
-              campus_affiliation: normalizedAffiliation,
-              avatar_url: nextAvatarUrl,
-              updated_at: nowIso,
-            },
-            { onConflict: 'id' }
-          )
-          .select('id, email, full_name, role, campus_affiliation, avatar_url, updated_at')
-          .maybeSingle();
+        const supabase = await this.resolveClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (!profileError && profileData) {
-          updatedProfileRow = profileData;
+        if (session?.user?.id) {
+          await supabase
+            .from('profiles')
+            .upsert(
+              {
+                id: session.user.id,
+                email: this.currentUser.email,
+                full_name: cleanName,
+                role: this.currentUser.role || 'member',
+                campus_affiliation: normalizedAffiliation,
+                avatar_url: nextAvatarUrl,
+                updated_at: nowIso,
+              },
+              { onConflict: 'id' }
+            )
+            .catch(() => {});
+
+          this.ignoreNextAuthEvent = true;
+          await supabase.auth
+            .updateUser({
+              data: {
+                full_name: cleanName,
+                fullName: cleanName,
+                campus_affiliation: normalizedAffiliation,
+              },
+            })
+            .catch(() => {});
+          this.ignoreNextAuthEvent = false;
         }
       } catch {
-        // Ignore if public.profiles table has not been migrated yet
+        this.ignoreNextAuthEvent = false;
       }
     }
 
-    // 2. Keep `auth.users` metadata synchronized when an active session is present
-    this.ignoreNextAuthEvent = true;
-    try {
-      const metadataPayload = {
-        full_name: cleanName,
-        fullName: cleanName,
-        campus_affiliation: normalizedAffiliation,
-        has_avatar: Boolean(nextAvatarUrl),
-      };
+    this.currentUser = {
+      ...this.currentUser,
+      fullName: cleanName,
+      campusAffiliation: normalizedAffiliation,
+      hasProfilePhoto: Boolean(nextAvatarUrl),
+      profilePhotoUrl: nextAvatarUrl,
+      updatedAt: nowIso,
+    };
 
-      if (activeSession?.access_token) {
-        await supabase.auth.updateUser({ data: metadataPayload }).catch(() => {});
-      }
-
-      // 3. Synchronize with server-side `/api/auth/profile` if available
-      if (typeof fetch !== 'undefined' && AUTH_CONFIG.baseUrl && this.accessToken) {
-        const profileEndpoint = `${AUTH_CONFIG.baseUrl.replace(/\/$/, '')}${AUTH_CONFIG.endpoints.profile}`;
-        await fetch(profileEndpoint, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-          body: JSON.stringify({
-            fullName: cleanName,
-            campusAffiliation: normalizedAffiliation,
-            avatarDataUrl: Boolean(removeAvatar) ? undefined : avatarDataUrl,
-            removeAvatar: Boolean(removeAvatar),
-          }),
-        }).catch(() => {});
-      }
-
-      const effectiveRow = updatedProfileRow || {
-        id: this.currentUser.id,
-        email: this.currentUser.email,
-        full_name: cleanName,
-        role: this.currentUser.role || 'member',
-        campus_affiliation: normalizedAffiliation,
-        avatar_url: nextAvatarUrl,
-        updated_at: nowIso,
-      };
-
-      this.currentUser = this.normalizeUser(
-        { id: this.currentUser.id, email: this.currentUser.email, user_metadata: metadataPayload },
-        effectiveRow
-      );
-      this.saveCachedUserProfile(this.currentUser);
-      this.notify();
-      return this.currentUser;
-    } finally {
-      this.ignoreNextAuthEvent = false;
-    }
+    this.saveCachedUserProfile(this.currentUser);
+    this.notify();
+    return this.currentUser;
   }
 
   // ---------------------------------------------------------------------------
-  // Sign Out (`supabase.auth.signOut`)
+  // Direct Supabase Sign Out (`logout` — zero `/api` calls)
   // ---------------------------------------------------------------------------
   async logout() {
     this.ignoreNextAuthEvent = true;
     try {
       if (this.isConfigured()) {
-        const supabase = await getSupabaseClient();
+        const supabase = await this.resolveClient();
         await supabase.auth.signOut();
       }
     } catch {
-      // Always clear local & server state even if network signOut fails
+      // Always clear local state even if network signOut fails
     } finally {
       this.ignoreNextAuthEvent = false;
-    }
-
-    if (typeof fetch !== 'undefined' && AUTH_CONFIG.baseUrl) {
-      const endpoint = `${AUTH_CONFIG.baseUrl.replace(/\/$/, '')}${AUTH_CONFIG.endpoints.logout}`;
-      try {
-        await fetch(endpoint, {
-          method: 'POST',
-          credentials: 'include',
-        });
-      } catch {
-        // Ignore network errors during logout bridge cleanup
-      }
     }
 
     for (const cb of this.cacheClearCallbacks) {
@@ -770,7 +677,6 @@ class AuthService {
       }
     }
 
-    this.avatarMemoryCache.clear();
     this.clearCachedUserProfile();
     this.accessToken = null;
     this.currentUser = null;
