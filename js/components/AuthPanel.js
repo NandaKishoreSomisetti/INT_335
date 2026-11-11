@@ -10,8 +10,8 @@
  * - Post-interaction validation, email verification state handling, and user-friendly status feedback
  */
 
-import { authService } from '../services/authService.js?v=sb6';
-import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb6';
+import { authService } from '../services/authService.js?v=sb7';
+import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb7';
 
 function escapeHtml(str) {
   return String(str)
@@ -185,11 +185,11 @@ export class AuthPanel {
             <button
               type="button"
               id="quick-demo-login-btn"
-              class="auth-demo-btn"
+              class="btn-primary auth-submit-btn auth-demo-btn"
               data-quick-demo-login
               ${this.isSubmitting ? 'disabled' : ''}
             >
-              <span aria-hidden="true">⚡</span>
+              <span class="auth-demo-btn__icon" aria-hidden="true">⚡</span>
               <span>Quick Demo Login</span>
             </button>
           </form>
@@ -329,11 +329,11 @@ export class AuthPanel {
             <button
               type="button"
               id="quick-demo-signup-btn"
-              class="auth-demo-btn"
+              class="btn-primary auth-submit-btn auth-demo-btn"
               data-quick-demo-login
               ${this.isSubmitting ? 'disabled' : ''}
             >
-              <span aria-hidden="true">⚡</span>
+              <span class="auth-demo-btn__icon" aria-hidden="true">⚡</span>
               <span>Quick Demo Login</span>
             </button>
           </form>

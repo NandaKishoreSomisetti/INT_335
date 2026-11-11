@@ -13,14 +13,14 @@
  *    - Parking discovery, saved-vehicle retrieval, shared persistent reviews, and staff controls
  */
 
-import { ASSET_CONFIG } from './config.js?v=sb6';
-import { authService } from './services/authService.js?v=sb6';
-import { initAccessibleValidation } from './utils/validation.js?v=sb6';
-import { Header } from './components/Header.js?v=sb6';
-import { AuthPanel } from './components/AuthPanel.js?v=sb6';
-import { SupportModal } from './components/SupportModal.js?v=sb6';
-import { ReviewSection } from './components/ReviewSection.js?v=sb6';
-import { CinematicHub } from './components/CinematicHub.js?v=sb6';
+import { ASSET_CONFIG } from './config.js?v=sb7';
+import { authService } from './services/authService.js?v=sb7';
+import { initAccessibleValidation } from './utils/validation.js?v=sb7';
+import { Header } from './components/Header.js?v=sb7';
+import { AuthPanel } from './components/AuthPanel.js?v=sb7';
+import { SupportModal } from './components/SupportModal.js?v=sb7';
+import { ReviewSection } from './components/ReviewSection.js?v=sb7';
+import { CinematicHub } from './components/CinematicHub.js?v=sb7';
 
 function initApp() {
   // 1. Configure hero background image source if overridden in ASSET_CONFIG
