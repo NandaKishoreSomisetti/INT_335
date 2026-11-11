@@ -58,7 +58,7 @@
       rel="stylesheet"
     />
 
-    <link rel="stylesheet" href="./css/styles.css" />
+    <link rel="stylesheet" href="./css/styles.css?v=20261111-sb2" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -175,7 +175,7 @@
                         inputmode="email"
                         enterkeyhint="next"
                         required
-                        placeholder="name@campus.edu"
+                        placeholder="you@gmail.com"
                       />
                     </div>
                     <div class="form-field">
@@ -241,6 +241,16 @@
     <!-- Support Modal Mount -->
     <div id="support-modal-mount"></div>
 
-    <script type="module" src="./js/main.js"></script>
+    <script>
+      window.PARKTRACE_CONFIG = Object.assign(
+        {
+          NEXT_PUBLIC_SUPABASE_URL: 'https://usraecvkfulgmajqpvpo.supabase.co',
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_SMKSc2nwXW7z73F6p6XDYw_NQjBVKEr',
+        },
+        window.PARKTRACE_CONFIG || {}
+      );
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./js/main.js?v=20261111-sb2"></script>
   </body>
 </html>

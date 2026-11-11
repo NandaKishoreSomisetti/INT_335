@@ -1,3 +1,4 @@
+
 /**
  * PARKTRACE Full-Stack HTTP Server & API (server.mjs)
  *
@@ -55,6 +56,15 @@ const SUPABASE_URL =
 const SUPABASE_ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   'sb_publishable_SMKSc2nwXW7z73F6p6XDYw_NQjBVKEr';
+
+if (
+  typeof SUPABASE_URL !== 'string' ||
+  SUPABASE_URL.trim().length === 0 ||
+  typeof SUPABASE_ANON_KEY !== 'string' ||
+  SUPABASE_ANON_KEY.trim().length === 0
+) {
+  console.warn('Supabase URL or Anon Key is missing from environment variables');
+}
 
 const STAFF_EMAILS = new Set(
   (process.env.STAFF_EMAILS || 'parktrace.1341@gmail.com')
@@ -601,6 +611,7 @@ async function handleApiRequest(req, res, url) {
     });
 
     if (error) {
+      console.error('Supabase signup error:', error);
       const status = error.status && error.status >= 400 ? error.status : 400;
       return sendJson(res, status, { message: error.message });
     }
@@ -1914,9 +1925,13 @@ function handleStaticRequest(req, res, url) {
     const ext = path.extname(absolutePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+    const isCodeOrMarkup =
+      ext === '.html' || ext === '.js' || ext === '.mjs' || ext === '.css';
     res.writeHead(200, {
       'Content-Type': contentType,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+      'Cache-Control': isCodeOrMarkup
+        ? 'no-store, no-cache, must-revalidate'
+        : 'public, max-age=3600',
     });
 
     const stream = fs.createReadStream(absolutePath);

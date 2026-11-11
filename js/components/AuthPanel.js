@@ -110,7 +110,7 @@ export class AuthPanel {
                 enterkeyhint="next"
                 required
                 value="${escapeHtml(rememberedEmail)}"
-                placeholder="name@campus.edu"
+                placeholder="you@gmail.com"
                 aria-errormessage="login-email-error"
               />
               <div id="login-email-error" class="field-error" role="alert">
@@ -218,7 +218,7 @@ export class AuthPanel {
                 inputmode="email"
                 enterkeyhint="next"
                 required
-                placeholder="name@campus.edu"
+                placeholder="you@gmail.com"
                 aria-errormessage="signup-email-error"
               />
               <div id="signup-email-error" class="field-error" role="alert">
@@ -437,29 +437,30 @@ export class AuthPanel {
 
       try {
         await authService.login({ email, password, rememberMe });
-      } catch (err) {
-        if (err?.requiresVerification) {
+      } catch (error) {
+        console.error('Supabase login error:', error);
+        if (error?.requiresVerification) {
           this.verificationPending = {
             email: email.trim(),
-            message: err.message,
+            message: error.message,
           };
           this.render();
           return;
         }
-        if (err?.isConfigurationMissing) {
+        if (error?.isConfigurationMissing) {
           const rememberNote = rememberMe
             ? 'Your email has been remembered on this device for your next visit.'
             : '';
           this.statusBanner = {
             type: 'config',
-            title: 'Sign-in temporarily unavailable',
-            message: `${err.message}${rememberNote ? ` ${rememberNote}` : ''}`,
+            title: 'Sign-in configuration error',
+            message: `${error.message}${rememberNote ? ` ${rememberNote}` : ''}`,
           };
         } else {
           this.statusBanner = {
             type: 'error',
             title: 'Log in failed',
-            message: err?.message || 'Unable to verify credentials. Please try again.',
+            message: error?.message || String(error),
           };
         }
         this.updateStatusSlot();
@@ -502,18 +503,19 @@ export class AuthPanel {
           this.render();
           return;
         }
-      } catch (err) {
-        if (err?.isConfigurationMissing) {
+      } catch (error) {
+        console.error('Supabase signup error:', error);
+        if (error?.isConfigurationMissing) {
           this.statusBanner = {
             type: 'config',
-            title: 'Registration temporarily unavailable',
-            message: err.message,
+            title: 'Registration configuration error',
+            message: error.message,
           };
         } else {
           this.statusBanner = {
             type: 'error',
             title: 'Sign up failed',
-            message: err?.message || 'Unable to create your account right now.',
+            message: error?.message || String(error),
           };
         }
         this.updateStatusSlot();

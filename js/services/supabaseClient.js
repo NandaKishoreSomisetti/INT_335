@@ -5,9 +5,8 @@
  * - `NEXT_PUBLIC_SUPABASE_URL`
  * - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
  *
- * Supports both browser execution (via `/vendor/supabase.js` UMD/ESM bridge or
- * `window.supabase`) and Node.js execution (`@supabase/supabase-js`), with an
- * adaptive storage adapter that honors the user's "Remember me" session preference.
+ * Validates that both variables are non-empty strings before calling
+ * `createClient(supabaseUrl, supabaseAnonKey)`.
  */
 
 import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js';
@@ -96,24 +95,30 @@ async function resolveCreateClient() {
 }
 
 /**
- * Returns the configured singleton Supabase client instance.
+ * Validates environment variables and returns the singleton Supabase client instance.
  */
 export async function getSupabaseClient() {
   if (supabaseInstance) {
     return supabaseInstance;
   }
 
-  const supabaseUrl = (SUPABASE_CONFIG.url || '').trim();
-  const supabaseAnonKey = (SUPABASE_CONFIG.anonKey || '').trim();
+  const supabaseUrl = SUPABASE_CONFIG?.url;
+  const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase configuration is missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+  if (
+    typeof supabaseUrl !== 'string' ||
+    supabaseUrl.trim().length === 0 ||
+    typeof supabaseAnonKey !== 'string' ||
+    supabaseAnonKey.trim().length === 0
+  ) {
+    console.warn('Supabase URL or Anon Key is missing from environment variables');
+    throw new Error('Supabase URL or Anon Key is missing from environment variables');
   }
 
   const createClient = await resolveCreateClient();
   const isBrowser = typeof window !== 'undefined';
 
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+  supabaseInstance = createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
     auth: {
       storageKey: STORAGE_KEYS.supabaseAuthToken,
       storage: isBrowser ? adaptiveBrowserStorage : undefined,
@@ -127,4 +132,3 @@ export async function getSupabaseClient() {
 }
 
 export { SUPABASE_CONFIG };
-

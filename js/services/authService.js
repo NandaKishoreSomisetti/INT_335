@@ -1,16 +1,14 @@
 /**
  * Authentication, Session & Profile Service Layer (js/services/authService.js)
  *
- * Powered by Supabase Auth (`@supabase/supabase-js`) and `public.profiles`:
- * 1. Sign Up: `supabase.auth.signUp()` with `email`, `password`, and `options.data` metadata,
- *    plus automatic synchronization into `public.profiles`.
- * 2. Sign In: `supabase.auth.signInWithPassword()` with clear, user-friendly error mapping.
- * 3. Sign Out & Reactive Session Management: `supabase.auth.signOut()` and
- *    `supabase.auth.onAuthStateChange()` without page stutter or reload loops.
- * 4. Profile Synchronization: Reads and updates `public.profiles` (with `user_metadata`
- *    and server bridge fallback resilience) for `full_name`, `campus_affiliation`
- *    ('student' | 'staff' | null), and `avatar_url`, keeping `campus_affiliation`
- *    strictly separate from authorization `role`.
+ * Powered by Supabase Auth (`@supabase/supabase-js`):
+ * 1. Sign Up: Registers users exclusively via `supabase.auth.signUp({ email, password, options: { data } })`,
+ *    logs `console.error('Supabase signup error:', error)` on failure, and surfaces `error.message` directly.
+ * 2. Sign In: Authenticates via `supabase.auth.signInWithPassword({ email, password })`,
+ *    immediately stores the user in client state upon `data.session`, and routes to the main dashboard.
+ * 3. Sign Out & Reactive Session Management: `supabase.auth.signOut()` and `supabase.auth.onAuthStateChange()`.
+ * 4. Profile Synchronization: Relies on the Supabase SQL trigger (`on_auth_user_created`) on signup
+ *    and guards any `public.profiles` reads/updates behind an active authenticated session.
  */
 
 import { AUTH_CONFIG, SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js';
@@ -27,80 +25,7 @@ export class AuthConfigurationError extends Error {
 const ALLOWED_AVATAR_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
 const STAFF_EMAIL_SET = new Set(['parktrace.1341@gmail.com']);
-
-/**
- * Translates raw Supabase Auth error messages into clear, user-friendly feedback.
- */
-function formatSupabaseAuthError(error, context = 'login') {
-  const rawMessage = String(error?.message || error?.error_description || '').trim();
-  const lower = rawMessage.toLowerCase();
-
-  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
-    return {
-      message: 'Invalid email or password. Please check your credentials and try again.',
-      requiresVerification: false,
-    };
-  }
-
-  if (lower.includes('email not confirmed') || lower.includes('email_not_confirmed')) {
-    return {
-      message:
-        'Please verify your email address before signing in. Check your inbox for the confirmation link.',
-      requiresVerification: true,
-    };
-  }
-
-  if (
-    lower.includes('user already registered') ||
-    lower.includes('already been registered') ||
-    lower.includes('already exists')
-  ) {
-    return {
-      message: 'An account with this email address already exists. Please log in instead.',
-      requiresVerification: false,
-    };
-  }
-
-  if (
-    lower.includes('rate limit') ||
-    lower.includes('too many requests') ||
-    error?.status === 429
-  ) {
-    return {
-      message: 'Too many authentication attempts. Please wait a moment before trying again.',
-      requiresVerification: false,
-    };
-  }
-
-  if (lower.includes('password should be at least')) {
-    return {
-      message: 'Password must be at least 8 characters long.',
-      requiresVerification: false,
-    };
-  }
-
-  if (lower.includes('unable to validate email') || lower.includes('invalid format')) {
-    return {
-      message: 'Please enter a valid email address.',
-      requiresVerification: false,
-    };
-  }
-
-  if (rawMessage) {
-    return {
-      message: rawMessage,
-      requiresVerification: false,
-    };
-  }
-
-  return {
-    message:
-      context === 'signup'
-        ? 'Unable to create your account right now. Please try again.'
-        : 'Unable to verify credentials right now. Please try again.',
-    requiresVerification: false,
-  };
-}
+const FALLBACK_USER_STORAGE_KEY = 'parktrace.active_user_profile';
 
 class AuthService {
   constructor() {
@@ -118,12 +43,18 @@ class AuthService {
    * Returns true when a valid Supabase configuration is present.
    */
   isConfigured() {
-    return Boolean(
-      SUPABASE_CONFIG.url &&
-        SUPABASE_CONFIG.url.trim().length > 0 &&
-        SUPABASE_CONFIG.anonKey &&
-        SUPABASE_CONFIG.anonKey.trim().length > 0
-    );
+    const supabaseUrl = SUPABASE_CONFIG?.url;
+    const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;
+    if (
+      typeof supabaseUrl !== 'string' ||
+      supabaseUrl.trim().length === 0 ||
+      typeof supabaseAnonKey !== 'string' ||
+      supabaseAnonKey.trim().length === 0
+    ) {
+      console.warn('Supabase URL or Anon Key is missing from environment variables');
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -215,8 +146,44 @@ class AuthService {
     }
   }
 
+  saveCachedUserProfile(user) {
+    if (typeof window === 'undefined' || !user) return;
+    try {
+      const serialized = JSON.stringify(user);
+      if (this.getRememberMePreference()) {
+        window.localStorage?.setItem(FALLBACK_USER_STORAGE_KEY, serialized);
+      } else {
+        window.sessionStorage?.setItem(FALLBACK_USER_STORAGE_KEY, serialized);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  loadCachedUserProfile() {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw =
+        window.sessionStorage?.getItem(FALLBACK_USER_STORAGE_KEY) ||
+        window.localStorage?.getItem(FALLBACK_USER_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  clearCachedUserProfile() {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage?.removeItem(FALLBACK_USER_STORAGE_KEY);
+      window.localStorage?.removeItem(FALLBACK_USER_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  // Supabase `public.profiles` Synchronization & User Normalization
+  // User Normalization & Guarded Profile Hydration
   // ---------------------------------------------------------------------------
   deriveDefaultRole(email, existingRole) {
     if (existingRole === 'staff' || existingRole === 'admin') {
@@ -226,16 +193,21 @@ class AuthService {
     return STAFF_EMAIL_SET.has(cleanEmail) ? 'staff' : 'member';
   }
 
-  normalizeUser(supabaseUser, profileRow = null) {
+  normalizeUser(supabaseUser, profileRow = null, overrides = {}) {
     if (!supabaseUser || !supabaseUser.id) return null;
 
     const userId = String(supabaseUser.id);
     const meta = supabaseUser.user_metadata || {};
-    const email = String(profileRow?.email || supabaseUser.email || '').trim().toLowerCase();
+    const email = String(
+      overrides.email || profileRow?.email || supabaseUser.email || ''
+    )
+      .trim()
+      .toLowerCase();
 
     const fullName =
       String(
-        profileRow?.full_name ||
+        overrides.fullName ||
+          profileRow?.full_name ||
           meta.full_name ||
           meta.fullName ||
           meta.name ||
@@ -247,12 +219,16 @@ class AuthService {
     const role = this.deriveDefaultRole(email, profileRow?.role || meta.role);
 
     const rawAffiliation =
-      profileRow?.campus_affiliation ?? meta.campus_affiliation ?? meta.campusAffiliation ?? null;
+      overrides.campusAffiliation !== undefined
+        ? overrides.campusAffiliation
+        : profileRow?.campus_affiliation ?? meta.campus_affiliation ?? meta.campusAffiliation ?? null;
     const campusAffiliation =
       rawAffiliation === 'student' || rawAffiliation === 'staff' ? rawAffiliation : null;
 
     let avatarUrl =
-      profileRow?.avatar_url !== undefined
+      overrides.avatarUrl !== undefined
+        ? overrides.avatarUrl
+        : profileRow?.avatar_url !== undefined
         ? profileRow.avatar_url
         : this.avatarMemoryCache.has(userId)
         ? this.avatarMemoryCache.get(userId)
@@ -260,7 +236,7 @@ class AuthService {
         ? meta.avatar_url
         : null;
 
-    if (meta.has_avatar === false) {
+    if (meta.has_avatar === false && overrides.avatarUrl === undefined) {
       avatarUrl = profileRow?.avatar_url ?? null;
     }
 
@@ -282,104 +258,62 @@ class AuthService {
   }
 
   /**
-   * Synchronizes the authenticated `auth.users` record with `public.profiles`.
-   * Automatically mirrors missing users into `public.profiles` and falls back cleanly
-   * to `user_metadata` if the database migration has not yet been applied.
+   * Strictly guarded profile fetch: ONLY queries `public.profiles` when an active
+   * authenticated `session.access_token` is present, and never throws or blocks auth.
    */
-  async syncProfileFromDatabase(supabase, supabaseUser, overrides = {}) {
-    if (!supabase || !supabaseUser?.id) {
-      return this.normalizeUser(supabaseUser);
+  async fetchProfileWhenAuthenticated(supabase, session, overrides = {}) {
+    if (!supabase || !session?.access_token || !session?.user?.id) {
+      return this.normalizeUser(session?.user, null, overrides);
     }
 
-    const meta = supabaseUser.user_metadata || {};
-    const email = String(supabaseUser.email || '').trim().toLowerCase();
     let profileRow = null;
-
     try {
       const { data: existingProfile, error: selectError } = await supabase
         .from('profiles')
         .select('id, email, full_name, role, campus_affiliation, avatar_url, updated_at')
-        .eq('id', supabaseUser.id)
+        .eq('id', session.user.id)
         .maybeSingle();
 
       if (!selectError && existingProfile) {
         profileRow = existingProfile;
         if (existingProfile.avatar_url) {
-          this.avatarMemoryCache.set(String(supabaseUser.id), existingProfile.avatar_url);
-        }
-      } else if (!selectError && !existingProfile) {
-        // Mirror new user into `public.profiles`
-        const initialPayload = {
-          id: supabaseUser.id,
-          email,
-          full_name:
-            overrides.fullName ||
-            meta.full_name ||
-            meta.fullName ||
-            email.split('@')[0] ||
-            'Campus Member',
-          role: this.deriveDefaultRole(email, meta.role),
-          campus_affiliation:
-            overrides.campusAffiliation !== undefined
-              ? overrides.campusAffiliation
-              : meta.campus_affiliation ?? null,
-          avatar_url:
-            overrides.avatarUrl !== undefined ? overrides.avatarUrl : meta.avatar_url ?? null,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data: insertedProfile, error: upsertError } = await supabase
-          .from('profiles')
-          .upsert(initialPayload, { onConflict: 'id' })
-          .select('id, email, full_name, role, campus_affiliation, avatar_url, updated_at')
-          .maybeSingle();
-
-        if (!upsertError && insertedProfile) {
-          profileRow = insertedProfile;
+          this.avatarMemoryCache.set(String(session.user.id), existingProfile.avatar_url);
         }
       }
     } catch {
-      // Gracefully fall back to user_metadata if public.profiles table is not yet migrated
+      // Never fail login/signup if public.profiles is not yet migrated
     }
 
-    return this.normalizeUser(supabaseUser, profileRow);
+    return this.normalizeUser(session.user, profileRow, overrides);
   }
 
   /**
-   * Bridges the active Supabase session token to the local Node server (`/api/auth/session`)
-   * so API calls with `credentials: 'include'` or `Authorization: Bearer` stay synchronized.
+   * Optional non-blocking bridge to the local Node server (`/api/auth/session`).
    */
   async syncServerSessionBridge(session, userProfile = null) {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined' || !session?.access_token) return null;
     try {
       const endpoint = `${AUTH_CONFIG.baseUrl.replace(/\/$/, '')}${AUTH_CONFIG.endpoints.session}`;
-      if (session?.access_token) {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            accessToken: session.access_token,
-            rememberMe: this.getRememberMePreference(),
-            profile: userProfile,
-          }),
-        });
-        if (res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          if (payload?.user?.profilePhotoUrl && userProfile && !userProfile.profilePhotoUrl) {
-            userProfile.hasProfilePhoto = true;
-            userProfile.profilePhotoUrl = payload.user.profilePhotoUrl;
-            this.avatarMemoryCache.set(userProfile.id, payload.user.profilePhotoUrl);
-          }
-          return payload?.user || null;
-        }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          accessToken: session.access_token,
+          rememberMe: this.getRememberMePreference(),
+          profile: userProfile,
+        }),
+      });
+      if (res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        return payload?.user || null;
       }
     } catch {
-      // Non-fatal if running in serverless/static preview
+      // Non-fatal on static hosts (e.g., GitHub Pages)
     }
     return null;
   }
@@ -396,8 +330,9 @@ class AuthService {
       supabase.auth.onAuthStateChange(async (event, session) => {
         if (this.ignoreNextAuthEvent) return;
 
-        if (event === 'SIGNED_OUT' || !session?.user) {
+        if (event === 'SIGNED_OUT') {
           this.accessToken = null;
+          this.clearCachedUserProfile();
           if (this.currentUser !== null) {
             this.currentUser = null;
             this.notify();
@@ -406,19 +341,30 @@ class AuthService {
         }
 
         if (
-          event === 'SIGNED_IN' ||
-          event === 'TOKEN_REFRESHED' ||
-          event === 'USER_UPDATED' ||
-          event === 'INITIAL_SESSION'
+          session?.user &&
+          (event === 'SIGNED_IN' ||
+            event === 'TOKEN_REFRESHED' ||
+            event === 'USER_UPDATED' ||
+            event === 'INITIAL_SESSION')
         ) {
           this.accessToken = session.access_token || null;
-          const syncedUser = await this.syncProfileFromDatabase(supabase, session.user);
-          await this.syncServerSessionBridge(session, syncedUser);
-          const prevJson = JSON.stringify(this.currentUser);
-          const nextJson = JSON.stringify(syncedUser);
-          this.currentUser = syncedUser;
-          if (prevJson !== nextJson) {
+          const immediateUser = this.normalizeUser(session.user);
+          if (!this.currentUser) {
+            this.currentUser = immediateUser;
+            this.saveCachedUserProfile(immediateUser);
             this.notify();
+          }
+
+          const hydratedUser = await this.fetchProfileWhenAuthenticated(supabase, session);
+          if (hydratedUser) {
+            const prevJson = JSON.stringify(this.currentUser);
+            const nextJson = JSON.stringify(hydratedUser);
+            this.currentUser = hydratedUser;
+            this.saveCachedUserProfile(hydratedUser);
+            this.syncServerSessionBridge(session, hydratedUser).catch(() => {});
+            if (prevJson !== nextJson) {
+              this.notify();
+            }
           }
         }
       });
@@ -441,20 +387,46 @@ class AuthService {
       const supabase = await getSupabaseClient();
       const { data, error } = await supabase.auth.getSession();
 
-      if (error || !data?.session?.user) {
-        this.accessToken = null;
-        this.currentUser = null;
+      if (!error && data?.session?.user) {
+        this.accessToken = data.session.access_token || null;
+        const immediateUser = this.normalizeUser(data.session.user);
+        this.currentUser = immediateUser;
+        this.saveCachedUserProfile(immediateUser);
         this.notify();
-        return null;
+
+        // Hydrate any additional profile fields without blocking UI routing
+        this.fetchProfileWhenAuthenticated(supabase, data.session)
+          .then((hydrated) => {
+            if (hydrated && this.currentUser?.id === hydrated.id) {
+              this.currentUser = hydrated;
+              this.saveCachedUserProfile(hydrated);
+              this.syncServerSessionBridge(data.session, hydrated).catch(() => {});
+              this.notify();
+            }
+          })
+          .catch(() => {});
+
+        return this.currentUser;
       }
 
-      this.accessToken = data.session.access_token || null;
-      const syncedUser = await this.syncProfileFromDatabase(supabase, data.session.user);
-      await this.syncServerSessionBridge(data.session, syncedUser);
-      this.currentUser = syncedUser;
+      const cached = this.loadCachedUserProfile();
+      if (cached && cached.id) {
+        this.currentUser = cached;
+        this.notify();
+        return this.currentUser;
+      }
+
+      this.accessToken = null;
+      this.currentUser = null;
       this.notify();
-      return this.currentUser;
+      return null;
     } catch {
+      const cached = this.loadCachedUserProfile();
+      if (cached && cached.id) {
+        this.currentUser = cached;
+        this.notify();
+        return this.currentUser;
+      }
       this.accessToken = null;
       this.currentUser = null;
       return null;
@@ -469,17 +441,13 @@ class AuthService {
     this.applyRememberMePolicy(cleanEmail, rememberMe);
 
     if (!this.isConfigured()) {
-      throw new AuthConfigurationError('Sign-in is temporarily unavailable. Please try again later.');
+      throw new AuthConfigurationError(
+        'Supabase URL or Anon Key is missing from environment variables'
+      );
     }
 
     await this.ensureAuthStateListener();
-
-    let supabase;
-    try {
-      supabase = await getSupabaseClient();
-    } catch {
-      throw new AuthConfigurationError('Sign-in service could not be initialized.');
-    }
+    const supabase = await getSupabaseClient();
 
     this.ignoreNextAuthEvent = true;
     try {
@@ -489,26 +457,45 @@ class AuthService {
       });
 
       if (error) {
-        const formatted = formatSupabaseAuthError(error, 'login');
-        const authErr = new Error(formatted.message);
-        authErr.requiresVerification = formatted.requiresVerification;
+        console.error('Supabase login error:', error);
+        const authErr = new Error(error.message || 'Authentication failed.');
+        authErr.code = error.code;
+        authErr.status = error.status;
         throw authErr;
       }
 
-      if (!data?.session || !data?.user) {
-        const verifyErr = new Error(
-          'Please verify your email address before signing in. Check your inbox for the confirmation link.'
-        );
-        verifyErr.requiresVerification = true;
-        throw verifyErr;
+      if (data?.session && data?.session?.user) {
+        this.accessToken = data.session.access_token || null;
+        // Immediately store user in client state and route to main dashboard
+        const immediateUser = this.normalizeUser(data.session.user);
+        this.currentUser = immediateUser;
+        this.saveCachedUserProfile(immediateUser);
+        this.notify();
+
+        // Non-blocking profile hydration & server session sync
+        this.fetchProfileWhenAuthenticated(supabase, data.session)
+          .then((hydratedUser) => {
+            if (hydratedUser && this.currentUser?.id === hydratedUser.id) {
+              this.currentUser = hydratedUser;
+              this.saveCachedUserProfile(hydratedUser);
+              this.syncServerSessionBridge(data.session, hydratedUser).catch(() => {});
+              this.notify();
+            }
+          })
+          .catch(() => {});
+
+        return this.currentUser;
       }
 
-      this.accessToken = data.session.access_token || null;
-      const syncedUser = await this.syncProfileFromDatabase(supabase, data.user);
-      await this.syncServerSessionBridge(data.session, syncedUser);
-      this.currentUser = syncedUser;
-      this.notify();
-      return this.currentUser;
+      if (data?.user) {
+        const fallbackUser = this.normalizeUser(data.user);
+        this.currentUser = fallbackUser;
+        this.saveCachedUserProfile(fallbackUser);
+        this.notify();
+        return this.currentUser;
+      }
+
+      throw new Error('No active session returned from Supabase.');
     } finally {
       this.ignoreNextAuthEvent = false;
     }
@@ -527,21 +514,16 @@ class AuthService {
 
     if (!this.isConfigured()) {
       throw new AuthConfigurationError(
-        'Registration is temporarily unavailable. Please try again later.'
+        'Supabase URL or Anon Key is missing from environment variables'
       );
     }
 
     await this.ensureAuthStateListener();
-
-    let supabase;
-    try {
-      supabase = await getSupabaseClient();
-    } catch {
-      throw new AuthConfigurationError('Registration service could not be initialized.');
-    }
+    const supabase = await getSupabaseClient();
 
     this.ignoreNextAuthEvent = true;
     try {
+      // Register user exclusively through supabase.auth.signUp (never insert raw passwords into tables)
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
@@ -555,46 +537,48 @@ class AuthService {
       });
 
       if (error) {
-        const formatted = formatSupabaseAuthError(error, 'signup');
-        const signUpErr = new Error(formatted.message);
-        signUpErr.requiresVerification = formatted.requiresVerification;
+        console.error('Supabase signup error:', error);
+        const signUpErr = new Error(error.message || 'Sign up failed.');
+        signUpErr.code = error.code;
+        signUpErr.status = error.status;
         throw signUpErr;
       }
 
-      // Detect obfuscated duplicate user response when email confirmations are enabled
+      // Detect duplicate user when Supabase obfuscates existing email addresses
       if (
         data?.user &&
         Array.isArray(data.user.identities) &&
         data.user.identities.length === 0
       ) {
-        throw new Error(
-          'An account with this email address already exists. Please log in instead.'
-        );
+        const dupError = new Error('User already registered with this email address.');
+        console.error('Supabase signup error:', dupError);
+        throw dupError;
       }
 
-      // Case 1: Active session returned immediately (Auto-confirm enabled in Supabase)
+      // Case 1: Active session returned immediately by Supabase
       if (data?.session && data?.user) {
         this.accessToken = data.session.access_token || null;
-        const syncedUser = await this.syncProfileFromDatabase(supabase, data.user, {
-          fullName: cleanName,
-        });
-        await this.syncServerSessionBridge(data.session, syncedUser);
-        this.currentUser = syncedUser;
+        const immediateUser = this.normalizeUser(data.user, null, { fullName: cleanName });
+        this.currentUser = immediateUser;
+        this.saveCachedUserProfile(immediateUser);
+        this.notify();
+
+        this.syncServerSessionBridge(data.session, immediateUser).catch(() => {});
+        return this.currentUser;
+      }
+
+      // Case 2: User created in auth.users (session is null if email confirmation is enabled)
+      if (data?.user) {
+        const createdUser = this.normalizeUser(data.user, null, { fullName: cleanName });
+        this.currentUser = createdUser;
+        this.saveCachedUserProfile(createdUser);
         this.notify();
         return this.currentUser;
       }
 
-      // Case 2: Email confirmation required by Supabase project settings
-      if (data?.user && !data?.session) {
-        return {
-          requiresVerification: true,
-          email: cleanEmail,
-          message:
-            'Your account has been created. Please check your email inbox to confirm your address before logging in.',
-        };
-      }
-
-      throw new Error('Unable to complete registration. Please try again.');
+      const unknownErr = new Error('Supabase signUp completed without returning a user record.');
+      console.error('Supabase signup error:', unknownErr);
+      throw unknownErr;
     } finally {
       this.ignoreNextAuthEvent = false;
     }
@@ -653,35 +637,39 @@ class AuthService {
 
     const supabase = await getSupabaseClient();
     const nowIso = new Date().toISOString();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const activeSession = sessionData?.session || null;
 
-    // 1. Upsert into `public.profiles` (with RLS `auth.uid() = id`)
+    // 1. Guarded upsert into `public.profiles` ONLY when an active authenticated session exists
     let updatedProfileRow = null;
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: this.currentUser.id,
-            email: this.currentUser.email,
-            full_name: cleanName,
-            role: this.currentUser.role || 'member',
-            campus_affiliation: normalizedAffiliation,
-            avatar_url: nextAvatarUrl,
-            updated_at: nowIso,
-          },
-          { onConflict: 'id' }
-        )
-        .select('id, email, full_name, role, campus_affiliation, avatar_url, updated_at')
-        .maybeSingle();
+    if (activeSession?.access_token && activeSession?.user?.id) {
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .upsert(
+            {
+              id: activeSession.user.id,
+              email: this.currentUser.email,
+              full_name: cleanName,
+              role: this.currentUser.role || 'member',
+              campus_affiliation: normalizedAffiliation,
+              avatar_url: nextAvatarUrl,
+              updated_at: nowIso,
+            },
+            { onConflict: 'id' }
+          )
+          .select('id, email, full_name, role, campus_affiliation, avatar_url, updated_at')
+          .maybeSingle();
 
-      if (!profileError && profileData) {
-        updatedProfileRow = profileData;
+        if (!profileError && profileData) {
+          updatedProfileRow = profileData;
+        }
+      } catch {
+        // Ignore if public.profiles table has not been migrated yet
       }
-    } catch {
-      // Fall through to auth.updateUser + server profile endpoint if table is not yet migrated
     }
 
-    // 2. Keep `auth.users` metadata synchronized (keeping JWT compact without large base64 strings)
+    // 2. Keep `auth.users` metadata synchronized when an active session is present
     this.ignoreNextAuthEvent = true;
     try {
       const metadataPayload = {
@@ -691,28 +679,21 @@ class AuthService {
         has_avatar: Boolean(nextAvatarUrl),
       };
 
-      const { data: userUpdateData, error: userUpdateError } = await supabase.auth.updateUser({
-        data: metadataPayload,
-      });
-
-      if (userUpdateError && !updatedProfileRow) {
-        throw new Error(userUpdateError.message || 'Could not update profile.');
+      if (activeSession?.access_token) {
+        await supabase.auth.updateUser({ data: metadataPayload }).catch(() => {});
       }
 
-      // 3. Synchronize with server-side `/api/auth/profile` endpoint
-      if (typeof fetch !== 'undefined' && AUTH_CONFIG.baseUrl) {
+      // 3. Synchronize with server-side `/api/auth/profile` if available
+      if (typeof fetch !== 'undefined' && AUTH_CONFIG.baseUrl && this.accessToken) {
         const profileEndpoint = `${AUTH_CONFIG.baseUrl.replace(/\/$/, '')}${AUTH_CONFIG.endpoints.profile}`;
-        const headers = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        };
-        if (this.accessToken) {
-          headers.Authorization = `Bearer ${this.accessToken}`;
-        }
         await fetch(profileEndpoint, {
           method: 'PUT',
           credentials: 'include',
-          headers,
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${this.accessToken}`,
+          },
           body: JSON.stringify({
             fullName: cleanName,
             campusAffiliation: normalizedAffiliation,
@@ -721,12 +702,6 @@ class AuthService {
           }),
         }).catch(() => {});
       }
-
-      const baseUser = userUpdateData?.user || {
-        id: this.currentUser.id,
-        email: this.currentUser.email,
-        user_metadata: metadataPayload,
-      };
 
       const effectiveRow = updatedProfileRow || {
         id: this.currentUser.id,
@@ -738,7 +713,11 @@ class AuthService {
         updated_at: nowIso,
       };
 
-      this.currentUser = this.normalizeUser(baseUser, effectiveRow);
+      this.currentUser = this.normalizeUser(
+        { id: this.currentUser.id, email: this.currentUser.email, user_metadata: metadataPayload },
+        effectiveRow
+      );
+      this.saveCachedUserProfile(this.currentUser);
       this.notify();
       return this.currentUser;
     } finally {
@@ -774,7 +753,6 @@ class AuthService {
       }
     }
 
-    // Clear all sensitive account caches registered by services
     for (const cb of this.cacheClearCallbacks) {
       try {
         cb();
@@ -784,6 +762,7 @@ class AuthService {
     }
 
     this.avatarMemoryCache.clear();
+    this.clearCachedUserProfile();
     this.accessToken = null;
     this.currentUser = null;
     this.intendedDestination = null;
