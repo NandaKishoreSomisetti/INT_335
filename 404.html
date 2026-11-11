@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PARKTRACE | Campus Vehicle Parking &amp; Retrieval</title>
+    <meta
+      name="description"
+      content="Find campus parking for bikes, cars, and other vehicles with PARKTRACE. Separate parking sections help you park smarter and find your vehicle more easily."
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#060c09" />
+    <link rel="icon" type="image/png" href="./assets/parktrace-logo.png" />
+    <link rel="apple-touch-icon" href="./assets/parktrace-logo.png" />
+
+    <!-- Open Graph Metadata (uses real available share image; production URLs omitted until deployment domain is set) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PARKTRACE" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="PARKTRACE | Campus Vehicle Parking &amp; Retrieval" />
+    <meta
+      property="og:description"
+      content="Find campus parking for bikes, cars, and other vehicles with PARKTRACE. Separate parking sections help you park smarter and find your vehicle more easily."
+    />
+    <meta property="og:image" content="./assets/hero-car-clean.jpg" />
+    <meta
+      property="og:image:alt"
+      content="Mint-green coupe parked on a dark reflective studio floor illuminated by crimson architectural lighting"
+    />
+    <meta property="og:image:width" content="1920" />
+    <meta property="og:image:height" content="1080" />
+
+    <!-- Twitter Card Metadata -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PARKTRACE | Campus Vehicle Parking &amp; Retrieval" />
+    <meta
+      name="twitter:description"
+      content="Find campus parking for bikes, cars, and other vehicles with PARKTRACE. Separate parking sections help you park smarter and find your vehicle more easily."
+    />
+    <meta name="twitter:image" content="./assets/hero-car-clean.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="Mint-green coupe parked on a dark reflective studio floor illuminated by crimson architectural lighting"
+    />
+
+    <!-- Preload critical LCP hero background image -->
+    <link
+      rel="preload"
+      as="image"
+      href="./assets/hero-car-clean.jpg"
+      fetchpriority="high"
+    />
+
+    <!-- Editorial & Form Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="./css/styles.css?v=20261111-sb9" />
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Single-Screen Hero Stage -->
+    <div class="hero-stage">
+      <!-- Decorative Photographic Background Layer (LCP Optimized, Non-Stretched) -->
+      <div class="hero-backdrop" aria-hidden="true">
+        <img
+          id="hero-bg-img"
+          class="hero-backdrop__img"
+          src="./assets/hero-car-clean.jpg"
+          alt=""
+          width="1920"
+          height="1080"
+          fetchpriority="high"
+          decoding="async"
+        />
+        <div class="hero-backdrop__vignette"></div>
+      </div>
+
+      <!-- Minimal Upper-Right Header (Quick Demo Login, Reviews & Support) -->
+      <header id="header-mount" class="site-header">
+        <nav class="top-nav" aria-label="Primary actions">
+          <div class="top-nav__actions">
+            <button
+              type="button"
+              id="header-demo-login-btn"
+              class="nav-pill-btn nav-pill-btn--demo"
+              data-quick-demo-login
+            >
+              <span class="auth-demo-btn__icon" aria-hidden="true">⚡</span>
+              <span class="nav-pill-btn__label">Quick Demo Login</span>
+            </button>
+            <button
+              type="button"
+              id="nav-reviews-btn"
+              class="nav-pill-btn"
+              aria-expanded="false"
+              aria-controls="reviews-section"
+            >
+              <span class="nav-pill-btn__label">Reviews</span>
+            </button>
+            <button
+              type="button"
+              id="nav-support-btn"
+              class="nav-pill-btn"
+              aria-haspopup="dialog"
+              aria-controls="support-modal"
+            >
+              <span class="nav-pill-btn__label">Support</span>
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      <!-- Main Hero Content: Left Car Showcase Space + Right Brand & Glass Auth Column -->
+      <main id="main-content" class="hero-main" tabindex="-1">
+        <div class="hero-grid">
+          <!-- Left Visual Column: Preserves Unobstructed View of the Mint-Green Car -->
+          <div class="hero-car-stage" aria-hidden="true"></div>
+
+          <!-- Right Editorial Brand & Authentication Column -->
+          <section class="hero-auth-column" aria-labelledby="brand-title">
+            <div class="brand-Lockup">
+              <p class="brand-kicker">
+                <img
+                  src="./assets/parktrace-logo.png"
+                  alt=""
+                  width="34"
+                  height="34"
+                  class="brand-kicker__logo"
+                  decoding="async"
+                />
+                <span class="brand-kicker__text">CAMPUS VEHICLE PARKING &amp; RETRIEVAL</span>
+              </p>
+              <h1 id="brand-title" class="brand-title">PARKTRACE</h1>
+              <p class="brand-tagline">Park smart. Find your way back.</p>
+              <p class="brand-description">
+                Smarter campus parking. Less searching, easier returns.
+              </p>
+            </div>
+
+            <!-- Glass Authentication Panel Mount (Initial semantic HTML preserved for SEO & crawlers) -->
+            <div id="auth-panel-mount" class="auth-panel-container">
+              <div class="glass-panel auth-card" role="region" aria-label="Account authentication">
+                <div class="auth-tabs" role="tablist" aria-label="Authentication mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-login"
+                    class="auth-tab is-active"
+                    aria-selected="true"
+                    aria-controls="panel-login"
+                    tabindex="0"
+                    data-tab="login"
+                  >
+                    Log in
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-signup"
+                    class="auth-tab"
+                    aria-selected="false"
+                    aria-controls="panel-signup"
+                    tabindex="-1"
+                    data-tab="signup"
+                  >
+                    Sign up
+                  </button>
+                </div>
+                <div id="panel-login" class="auth-tabpanel" role="tabpanel" aria-labelledby="tab-login">
+                  <form id="login-form" class="auth-form" method="post" action="#login" novalidate>
+                    <div class="form-field">
+                      <label for="login-email" class="form-label">Email address</label>
+                      <input
+                        type="email"
+                        id="login-email"
+                        name="email"
+                        class="form-input"
+                        autocomplete="username"
+                        inputmode="email"
+                        enterkeyhint="next"
+                        required
+                        placeholder="you@gmail.com"
+                      />
+                    </div>
+                    <div class="form-field">
+                      <div class="form-label-row">
+                        <label for="current-password" class="form-label">Password</label>
+                      </div>
+                      <div class="password-input-wrapper">
+                        <input
+                          type="password"
+                          id="current-password"
+                          name="password"
+                          class="form-input form-input--password"
+                          autocomplete="current-password"
+                          enterkeyhint="done"
+                          required
+                          placeholder="Enter your password"
+                        />
+                        <button
+                          type="button"
+                          class="password-toggle"
+                          data-toggle-password="current-password"
+                          aria-label="Show password"
+                          aria-pressed="false"
+                        >
+                          <span class="password-toggle__text">Show</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="form-row-options">
+                      <label for="remember-me" class="checkbox-control">
+                        <input
+                          type="checkbox"
+                          id="remember-me"
+                          name="rememberMe"
+                          class="visually-hidden"
+                        />
+                        <span class="checkbox-control__text">Remember me</span>
+                      </label>
+                    </div>
+                    <button type="submit" id="login-submit-btn" class="btn-primary auth-submit-btn">
+                      <span>Log in</span>
+                    </button>
+                    <button
+                      type="button"
+                      id="quick-demo-login-btn"
+                      class="btn-primary auth-submit-btn auth-demo-btn"
+                      data-quick-demo-login
+                    >
+                      <span class="auth-demo-btn__icon" aria-hidden="true">⚡</span>
+                      <span>Quick Demo Login</span>
+                    </button>
+                  </form>
+                </div>
+                <div id="panel-signup" class="auth-tabpanel" role="tabpanel" aria-labelledby="tab-signup" hidden></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- Collapsible Reviews Section (Hidden until "Reviews" is clicked) -->
+    <section
+      id="reviews-section"
+      class="reviews-section"
+      aria-labelledby="reviews-section-title"
+      hidden
+    ></section>
+
+    <!-- Authenticated Cinematic Hub Mount (Shown only when authenticated) -->
+    <div id="authenticated-hub-mount" hidden></div>
+
+    <!-- Support Modal Mount -->
+    <div id="support-modal-mount"></div>
+
+    <script>
+      window.PARKTRACE_CONFIG = Object.assign(
+        {
+          NEXT_PUBLIC_SUPABASE_URL: 'https://usraecvkfulgmajqpvpo.supabase.co',
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_SMKSc2nwXW7z73F6p6XDYw_NQjBVKEr',
+        },
+        window.PARKTRACE_CONFIG || {}
+      );
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="./js/main.js?v=sb9"></script>
+  </body>
+</html>
