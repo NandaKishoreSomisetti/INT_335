@@ -1,71 +1,87 @@
 /**
- * PARKTRACE Application Configuration (js/config.js)
+ * PARKTRACE Configuration Layer (js/config.js)
  *
- * Central configuration for contact details, brand & background assets,
- * authentication endpoints, shared reviews backend, and campus parking services.
+ * Centralizes environment variables, Supabase credentials, API endpoints,
+ * support channels, and asset paths.
  */
 
-const runtimeOverrides =
-  typeof window !== 'undefined' && window.PARKTRACE_CONFIG
-    ? window.PARKTRACE_CONFIG
-    : {};
+const globalConfig =
+  typeof window !== 'undefined' && window.PARKTRACE_CONFIG ? window.PARKTRACE_CONFIG : {};
 
-/**
- * Support team email address (Requirement 3).
- * Rendered as a working mailto: link in the Support modal.
- */
-export const SUPPORT_EMAIL =
-  runtimeOverrides.SUPPORT_EMAIL ?? 'parktrace.1341@gmail.com';
+const nodeEnv =
+  typeof process !== 'undefined' && process && process.env ? process.env : {};
 
-/**
- * Temporary customer-care number (Requirement 3).
- * Calling is disabled for this demo number.
- */
-export const SUPPORT_PHONE =
-  runtimeOverrides.SUPPORT_PHONE ?? '00000 00000 — Demo number';
+export const SUPABASE_CONFIG = {
+  /**
+   * Public Supabase project URL (`NEXT_PUBLIC_SUPABASE_URL`).
+   */
+  url:
+    globalConfig.NEXT_PUBLIC_SUPABASE_URL ??
+    nodeEnv.NEXT_PUBLIC_SUPABASE_URL ??
+    'https://usraecvkfulgmajqpvpo.supabase.co',
 
-/**
- * Hero background & official brand logo asset configuration.
- */
-export const ASSET_CONFIG = {
-  heroImageUrl: runtimeOverrides.HERO_IMAGE_URL ?? './assets/hero-car-clean.jpg',
-  heroImageAlt: runtimeOverrides.HERO_IMAGE_ALT ?? '',
-  logoUrl: runtimeOverrides.LOGO_URL ?? './assets/parktrace-logo.png',
+  /**
+   * Public Supabase publishable / anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+   */
+  anonKey:
+    globalConfig.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    nodeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    'sb_publishable_SMKSc2nwXW7z73F6p6XDYw_NQjBVKEr',
 };
 
-/**
- * Authentication integration configuration.
- */
 export const AUTH_CONFIG = {
-  baseUrl: runtimeOverrides.AUTH_API_BASE_URL ?? '/api/auth',
+  /**
+   * Base URL for the server-side authentication & profile synchronization API.
+   */
+  baseUrl: globalConfig.AUTH_API_BASE_URL ?? '/api/auth',
+
   endpoints: {
     login: '/login',
-    signUp: '/signup',
+    signup: '/signup',
     logout: '/logout',
     session: '/session',
     profile: '/profile',
   },
-  storageKeys: {
-    rememberedEmail: 'parktrace_remembered_email',
-    rememberPreference: 'parktrace_remember_me',
-  },
 };
 
-/**
- * Shared persistent Reviews & Likes backend configuration.
- * Used by both the public homepage and the authenticated Reviews page.
- */
 export const REVIEWS_CONFIG = {
-  baseUrl: runtimeOverrides.REVIEWS_API_BASE_URL ?? '/api/reviews',
-  pageSize: 6,
+  /**
+   * Base URL for the shared persistent Reviews & Likes REST API.
+   */
+  baseUrl: globalConfig.REVIEWS_API_BASE_URL ?? '/api/reviews',
 };
 
-/**
- * Campus Parking Discovery, Saved Vehicle Sessions, Reports & Staff Controls configuration.
- */
 export const PARKING_CONFIG = {
-  baseUrl: runtimeOverrides.PARKING_API_BASE_URL ?? '/api/parking',
-  sessionsUrl: runtimeOverrides.SESSIONS_API_BASE_URL ?? '/api/sessions',
-  reportsUrl: runtimeOverrides.REPORTS_API_BASE_URL ?? '/api/reports',
-  staffUrl: runtimeOverrides.STAFF_API_BASE_URL ?? '/api/staff',
+  /**
+   * Base URL for campus parking lots, sections, QR lookup, sessions, and staff updates.
+   */
+  baseUrl: globalConfig.PARKING_API_BASE_URL ?? '/api/parking',
+  sessionsUrl: globalConfig.SESSIONS_API_BASE_URL ?? '/api/sessions',
+  reportsUrl: globalConfig.REPORTS_API_BASE_URL ?? '/api/reports',
+  staffUrl: globalConfig.STAFF_API_BASE_URL ?? '/api/staff',
+};
+
+export const SUPPORT_CONFIG = {
+  /**
+   * Support email address and phone number displayed in the Support modal.
+   */
+  supportEmail: globalConfig.SUPPORT_EMAIL ?? 'parktrace.1341@gmail.com',
+  supportPhoneDisplay: globalConfig.SUPPORT_PHONE_DISPLAY ?? '+91 75692 05626',
+  supportPhoneHref: globalConfig.SUPPORT_PHONE_HREF ?? 'tel:+917569205626',
+  hoursLabel: globalConfig.SUPPORT_HOURS ?? 'Mon – Sat, 7:30 AM – 8:30 PM Campus Time',
+  officeLocation: globalConfig.SUPPORT_OFFICE ?? 'Campus Mobility & Security Desk, Block A Ground Floor',
+};
+
+export const ASSET_CONFIG = {
+  /**
+   * Clean photographic background asset path.
+   */
+  heroImageUrl: globalConfig.HERO_IMAGE_URL ?? './assets/hero-car-clean.jpg',
+  heroImageAlt: '',
+};
+
+export const STORAGE_KEYS = {
+  rememberedEmail: 'parktrace.remembered_email',
+  rememberMeEnabled: 'parktrace.remember_me_enabled',
+  supabaseAuthToken: 'parktrace.supabase.auth.token',
 };

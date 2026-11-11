@@ -13,6 +13,16 @@
  */
 
 import { REVIEWS_CONFIG } from '../config.js';
+import { authService } from './authService.js';
+
+function buildHeaders(extra = {}) {
+  const headers = { Accept: 'application/json', ...extra };
+  const token = authService.getAccessToken?.();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export class ReviewConfigurationError extends Error {
   constructor(message) {
@@ -108,7 +118,7 @@ class ReviewService {
     const response = await fetch(REVIEWS_CONFIG.baseUrl.replace(/\/$/, ''), {
       method: 'GET',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     if (!response.ok) {
@@ -159,10 +169,7 @@ class ReviewService {
     const response = await fetch(REVIEWS_CONFIG.baseUrl.replace(/\/$/, ''), {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         text: cleanText,
       }),
@@ -221,10 +228,7 @@ class ReviewService {
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ text: cleanText }),
     });
 
@@ -261,7 +265,7 @@ class ReviewService {
     const response = await fetch(endpoint, {
       method: 'DELETE',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -295,9 +299,7 @@ class ReviewService {
     const response = await fetch(endpoint, {
       method: shouldLike ? 'POST' : 'DELETE',
       credentials: 'include',
-      headers: {
-        Accept: 'application/json',
-      },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));

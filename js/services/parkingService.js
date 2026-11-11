@@ -16,6 +16,15 @@
 import { PARKING_CONFIG } from '../config.js';
 import { authService } from './authService.js';
 
+function buildHeaders(extra = {}) {
+  const headers = { Accept: 'application/json', ...extra };
+  const token = authService.getAccessToken?.();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 const STATUS_PRIORITY = {
   Available: 1,
   Limited: 2,
@@ -145,7 +154,7 @@ class ParkingService {
     const response = await fetch(PARKING_CONFIG.baseUrl.replace(/\/$/, ''), {
       method: 'GET',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -180,7 +189,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'GET',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -198,7 +207,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'GET',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -216,10 +225,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(sessionData),
     });
 
@@ -242,10 +248,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(updates),
     });
 
@@ -266,7 +269,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'DELETE',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -284,10 +287,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ sectionId, sectionName, issueType, description }),
     });
 
@@ -307,7 +307,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'GET',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: buildHeaders(),
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -322,10 +322,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(lotData),
     });
 
@@ -342,10 +339,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(lotData),
     });
 
@@ -362,10 +356,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(sectionData),
     });
 
@@ -382,10 +373,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(sectionData),
     });
 
@@ -402,10 +390,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(statusData),
     });
 
@@ -422,10 +407,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(reviewData),
     });
 
@@ -441,10 +423,7 @@ class ParkingService {
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(settingsData),
     });
 
