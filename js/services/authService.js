@@ -9,8 +9,8 @@
  * - Includes one-click `demoLogin()` ("⚡ Quick Demo Login") with resilient local fallback.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb5';
-import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb5';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb6';
+import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb6';
 
 export class AuthConfigurationError extends Error {
   constructor(message) {
@@ -344,6 +344,11 @@ class AuthService {
         data: { session },
       } = await supabase.auth.getSession();
 
+      // Never overwrite an active in-memory user (such as an instant Quick Demo Login)
+      if (this.currentUser && this.currentUser.id) {
+        return this.currentUser;
+      }
+
       if (session?.user) {
         this.accessToken = session.access_token || null;
         const user = this.normalizeUser(session.user);
@@ -362,9 +367,11 @@ class AuthService {
 
       this.accessToken = null;
       this.currentUser = null;
-      this.notify();
       return null;
     } catch {
+      if (this.currentUser && this.currentUser.id) {
+        return this.currentUser;
+      }
       const cached = this.loadCachedUserProfile();
       if (cached && cached.id) {
         this.currentUser = cached;
@@ -492,31 +499,11 @@ class AuthService {
 
   // ---------------------------------------------------------------------------
   // Quick Demo Login (`demoLogin`)
+  // Authenticates immediately and routes straight to the main dashboard
   // ---------------------------------------------------------------------------
   async demoLogin() {
     this.ignoreNextAuthEvent = true;
     try {
-      if (this.isConfigured()) {
-        try {
-          const supabase = await this.resolveClient();
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: 'demo@example.com',
-            password: 'Demo@12345',
-          });
-
-          if (!error && data?.user) {
-            this.accessToken = data?.session?.access_token || null;
-            const liveDemoUser = this.normalizeUser(data.user, null, { isDemo: true });
-            this.currentUser = liveDemoUser;
-            this.saveCachedUserProfile(liveDemoUser);
-            this.notify();
-            return this.currentUser;
-          }
-        } catch {
-          // Fall through to local fallback demo session if Supabase rejects demo credentials
-        }
-      }
-
       const demoUser = {
         id: 'demo-user-12345',
         email: 'demo@example.com',
@@ -530,7 +517,7 @@ class AuthService {
         isDemo: true,
       });
 
-      this.accessToken = null;
+      this.accessToken = 'demo-session-token-12345';
       this.currentUser = normalizedDemo;
       this.saveCachedUserProfile(normalizedDemo);
       this.notify();

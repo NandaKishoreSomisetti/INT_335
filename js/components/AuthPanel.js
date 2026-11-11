@@ -10,8 +10,8 @@
  * - Post-interaction validation, email verification state handling, and user-friendly status feedback
  */
 
-import { authService } from '../services/authService.js?v=sb5';
-import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb5';
+import { authService } from '../services/authService.js?v=sb6';
+import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb6';
 
 function escapeHtml(str) {
   return String(str)
@@ -39,9 +39,14 @@ export class AuthPanel {
   }
 
   init() {
+    this.wasAuthenticated = Boolean(authService.currentUser);
     this.render();
-    this.unsubscribeAuth = authService.subscribe(() => {
-      this.render();
+    this.unsubscribeAuth = authService.subscribe((user) => {
+      const isNowAuthenticated = Boolean(user);
+      if (this.wasAuthenticated && !isNowAuthenticated) {
+        this.render();
+      }
+      this.wasAuthenticated = isNowAuthenticated;
     });
   }
 
@@ -176,6 +181,17 @@ export class AuthPanel {
                   : `<span>Log in</span>`
               }
             </button>
+
+            <button
+              type="button"
+              id="quick-demo-login-btn"
+              class="auth-demo-btn"
+              data-quick-demo-login
+              ${this.isSubmitting ? 'disabled' : ''}
+            >
+              <span aria-hidden="true">⚡</span>
+              <span>Quick Demo Login</span>
+            </button>
           </form>
         </div>
 
@@ -308,6 +324,17 @@ export class AuthPanel {
                   ? `<progress aria-label="Creating account" class="loading-spinner"></progress><span>Creating account…</span>`
                   : `<span>Create account</span>`
               }
+            </button>
+
+            <button
+              type="button"
+              id="quick-demo-signup-btn"
+              class="auth-demo-btn"
+              data-quick-demo-login
+              ${this.isSubmitting ? 'disabled' : ''}
+            >
+              <span aria-hidden="true">⚡</span>
+              <span>Quick Demo Login</span>
             </button>
           </form>
         </div>
@@ -448,6 +475,32 @@ export class AuthPanel {
       } finally {
         this.setSubmittingState(false, 'login');
       }
+    });
+
+    // Quick Demo Login one-click handler (both login & signup panels)
+    const demoButtons = this.mountNode.querySelectorAll(
+      '[data-quick-demo-login], #quick-demo-login-btn, #quick-demo-signup-btn'
+    );
+    demoButtons.forEach((demoBtn) => {
+      demoBtn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (this.isSubmitting) return;
+
+        this.statusBanner = null;
+        this.updateStatusSlot();
+
+        try {
+          await authService.demoLogin();
+        } catch (error) {
+          console.error('Auth error details:', error);
+          this.statusBanner = {
+            type: 'error',
+            title: 'Demo login failed',
+            message: error?.message || String(error),
+          };
+          this.updateStatusSlot();
+        }
+      });
     });
 
     // Sign up submission

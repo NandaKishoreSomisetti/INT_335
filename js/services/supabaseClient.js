@@ -5,7 +5,7 @@
  * using `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb5';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb6';
 
 const supabaseUrl = SUPABASE_CONFIG?.url;
 const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;

@@ -20,13 +20,13 @@
  *   freshness policy, user reports review, and status-update audit history)
  */
 
-import { authService } from '../services/authService.js?v=sb5';
+import { authService } from '../services/authService.js?v=sb6';
 import {
   parkingService,
   recommendParkingSections,
-} from '../services/parkingService.js?v=sb5';
-import { renderBrandLogo } from './BrandLogo.js?v=sb5';
-import { ReviewSection } from './ReviewSection.js?v=sb5';
+} from '../services/parkingService.js?v=sb6';
+import { renderBrandLogo } from './BrandLogo.js?v=sb6';
+import { ReviewSection } from './ReviewSection.js?v=sb6';
 
 function escapeHtml(str) {
   return String(str ?? '')
