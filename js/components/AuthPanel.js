@@ -10,8 +10,8 @@
  * - Post-interaction validation, email verification state handling, and user-friendly status feedback
  */
 
-import { authService } from '../services/authService.js?v=sb7';
-import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb7';
+import { authService } from '../services/authService.js?v=sb8';
+import { validateFormOnSubmit, validateControlConstraints } from '../utils/validation.js?v=sb8';
 
 function escapeHtml(str) {
   return String(str)

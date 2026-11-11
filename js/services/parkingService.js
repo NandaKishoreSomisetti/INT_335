@@ -7,7 +7,7 @@
  *   `/api/sessions` routes (preventing 404 / 405 Method Not Allowed on GitHub Pages).
  */
 
-import { authService } from './authService.js?v=sb6';
+import { authService } from './authService.js?v=sb8';
 
 const STATUS_PRIORITY = {
   Available: 1,
@@ -18,10 +18,10 @@ const STATUS_PRIORITY = {
 };
 
 const STORAGE_KEYS = {
-  catalog: 'parktrace.parking_catalog.v1',
-  sessions: 'parktrace.parking_sessions.v1',
-  reports: 'parktrace.section_reports.v1',
-  auditLogs: 'parktrace.staff_audit_logs.v1',
+  catalog: 'parktrace.parking_catalog.v2',
+  sessions: 'parktrace.parking_sessions.v2',
+  reports: 'parktrace.section_reports.v2',
+  auditLogs: 'parktrace.staff_audit_logs.v2',
 };
 
 function createInitialCatalog() {
@@ -42,21 +42,27 @@ function createInitialCatalog() {
     lots: [
       {
         id: 'lot-north-academic',
+        code: 'LOT-A',
         name: 'North Academic Lot A',
+        destination: 'Academic Block A',
         nearestDestinations: ['Academic Block A', 'Central Library & Research Hub'],
         description: 'Covered and open bays directly adjacent to Academic Block A North Gate.',
         active: true,
       },
       {
         id: 'lot-east-innovation',
+        code: 'LOT-B',
         name: 'East Innovation Lot B',
+        destination: 'Academic Block B',
         nearestDestinations: ['Academic Block B', 'Engineering & Innovation Wing'],
         description: 'Multi-section transit bay serving Engineering labs and Block B lecture halls.',
         active: true,
       },
       {
         id: 'lot-south-commons',
+        code: 'LOT-C',
         name: 'South Commons Lot C',
+        destination: 'Student Activity Center',
         nearestDestinations: ['Student Activity Center', 'Administrative & Security Complex'],
         description: 'High-capacity perimeter lot with shaded two-wheeler and four-wheeler bays.',
         active: true,
@@ -67,127 +73,190 @@ function createInitialCatalog() {
         id: 'sec-a-bike-1',
         lotId: 'lot-north-academic',
         code: 'PT-SEC-A1',
+        qrCode: 'PT-SEC-A1',
         name: 'Section A1 — Two-Wheeler Deck',
         vehicleTypes: ['bike'],
         destination: 'Academic Block A',
         walkingMinutes: 2,
         accessRule: 'general',
-        accessLabel: 'Students & Staff',
+        accessLabel: 'Students & Staff Permit',
+        restrictions: 'Students & Staff Permit',
+        capacity: 120,
         totalCapacity: 120,
+        availableSpaces: 34,
         availableSpots: 34,
+        hasReliableCount: true,
         status: 'Available',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Row A', 'Row B', 'Row C', 'Row D'],
-        landmarkHint: 'Opposite Block A Main Stairwell & Security Kiosk',
+        entrance: 'Gate 1 — Opposite Block A Main Stairwell & Security Kiosk',
+        landmarkHint: 'Gate 1 — Opposite Block A Main Stairwell & Security Kiosk',
+        latitude: 31.2554,
+        longitude: 75.7049,
       },
       {
         id: 'sec-a-car-2',
         lotId: 'lot-north-academic',
         code: 'PT-SEC-A2',
+        qrCode: 'PT-SEC-A2',
         name: 'Section A2 — Four-Wheeler Court',
         vehicleTypes: ['car'],
         destination: 'Academic Block A',
         walkingMinutes: 3,
         accessRule: 'general',
-        accessLabel: 'Students & Staff',
+        accessLabel: 'Students & Staff Permit',
+        restrictions: 'Students & Staff Permit',
+        capacity: 45,
         totalCapacity: 45,
+        availableSpaces: 5,
         availableSpots: 5,
+        hasReliableCount: true,
         status: 'Limited',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Row 1', 'Row 2', 'Row 3'],
-        landmarkHint: 'Near North Gate Solar Canopy',
+        entrance: 'North Gate Solar Canopy Entrance',
+        landmarkHint: 'North Gate Solar Canopy Entrance',
+        latitude: 31.2558,
+        longitude: 75.7053,
       },
       {
         id: 'sec-a-accessible-3',
         lotId: 'lot-north-academic',
         code: 'PT-SEC-A3',
+        qrCode: 'PT-SEC-A3',
         name: 'Section A3 — Accessible & EV Priority Bays',
         vehicleTypes: ['bike', 'car', 'other'],
         destination: 'Central Library & Research Hub',
         walkingMinutes: 1,
         accessRule: 'accessible',
-        accessLabel: 'Accessible / EV Priority Permit Required',
+        accessLabel: 'Accessible / EV Priority Permit',
+        restrictions: 'Accessible / EV Priority Permit',
+        capacity: 20,
         totalCapacity: 20,
+        availableSpaces: 9,
         availableSpots: 9,
+        hasReliableCount: true,
         status: 'Available',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Priority Row P1', 'Priority Row P2'],
+        entrance: 'Step-free ramp entrance beside Central Library West Doors',
         landmarkHint: 'Step-free ramp entrance beside Central Library West Doors',
+        latitude: 31.2549,
+        longitude: 75.7042,
       },
       {
         id: 'sec-b-bike-1',
         lotId: 'lot-east-innovation',
         code: 'PT-SEC-B1',
+        qrCode: 'PT-SEC-B1',
         name: 'Section B1 — East Bike & Scooter Bay',
         vehicleTypes: ['bike'],
         destination: 'Engineering & Innovation Wing',
         walkingMinutes: 2,
         accessRule: 'general',
-        accessLabel: 'Students & Staff',
+        accessLabel: 'Students & Staff Permit',
+        restrictions: 'Students & Staff Permit',
+        capacity: 150,
         totalCapacity: 150,
+        availableSpaces: 0,
         availableSpots: 0,
+        hasReliableCount: true,
         status: 'Full',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Row E1', 'Row E2', 'Row E3', 'Row E4'],
-        landmarkHint: 'Beside Robotics Workshop Entrance',
+        entrance: 'East Gate — Beside Robotics Workshop Entrance',
+        landmarkHint: 'East Gate — Beside Robotics Workshop Entrance',
+        latitude: 31.2537,
+        longitude: 75.7068,
       },
       {
         id: 'sec-b-car-2',
         lotId: 'lot-east-innovation',
         code: 'PT-SEC-B2',
+        qrCode: 'PT-SEC-B2',
         name: 'Section B2 — East Car & Utility Section',
         vehicleTypes: ['car', 'other'],
         destination: 'Academic Block B',
         walkingMinutes: 3,
         accessRule: 'general',
-        accessLabel: 'Students & Staff',
+        accessLabel: 'Students & Staff Permit',
+        restrictions: 'Students & Staff Permit',
+        capacity: 60,
         totalCapacity: 60,
+        availableSpaces: 22,
         availableSpots: 22,
+        hasReliableCount: true,
         status: 'Available',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Row C1', 'Row C2', 'Row C3'],
+        entrance: 'Adjacent to Block B Amphitheater Walkway',
         landmarkHint: 'Adjacent to Block B Amphitheater Walkway',
+        latitude: 31.2533,
+        longitude: 75.7061,
       },
       {
         id: 'sec-c-multi-1',
         lotId: 'lot-south-commons',
         code: 'PT-SEC-C1',
+        qrCode: 'PT-SEC-C1',
         name: 'Section C1 — South Overflow Two-Wheeler Zone',
         vehicleTypes: ['bike'],
-        destination: 'Engineering & Innovation Wing',
-        walkingMinutes: 5,
+        destination: 'Student Activity Center',
+        walkingMinutes: 4,
         accessRule: 'general',
-        accessLabel: 'Students & Staff',
+        accessLabel: 'Students & Staff Permit',
+        restrictions: 'Students & Staff Permit',
+        capacity: 180,
         totalCapacity: 180,
+        availableSpaces: 92,
         availableSpots: 92,
+        hasReliableCount: true,
         status: 'Available',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Row S1', 'Row S2', 'Row S3', 'Row S4', 'Row S5'],
-        landmarkHint: 'Covered walkway linking South Commons to Engineering Wing',
+        entrance: 'Covered walkway linking South Commons to Activity Center',
+        landmarkHint: 'Covered walkway linking South Commons to Activity Center',
+        latitude: 31.2521,
+        longitude: 75.7039,
       },
       {
         id: 'sec-c-staff-2',
         lotId: 'lot-south-commons',
         code: 'PT-SEC-C2',
+        qrCode: 'PT-SEC-C2',
         name: 'Section C2 — Faculty & Staff Reserved Court',
         vehicleTypes: ['bike', 'car', 'other'],
         destination: 'Administrative & Security Complex',
         walkingMinutes: 2,
         accessRule: 'staff_only',
         accessLabel: 'Staff & Faculty Permit Only',
+        restrictions: 'Staff & Faculty Permit Only',
+        capacity: 40,
         totalCapacity: 40,
+        availableSpaces: 14,
         availableSpots: 14,
+        hasReliableCount: true,
         status: 'Available',
         updatedAt: nowIso,
         updatedBy: 'Campus Attendant Desk',
+        source: 'Campus Attendant Desk',
         rows: ['Staff Row R1', 'Staff Row R2'],
+        entrance: 'Behind Administrative Block Security Barrier',
         landmarkHint: 'Behind Administrative Block Security Barrier',
+        latitude: 31.2518,
+        longitude: 75.7032,
       },
     ],
   };
@@ -212,21 +281,44 @@ function writeJsonStorage(key, value) {
   }
 }
 
-function computeFreshnessState(section, settings) {
+function normalizeSectionRecord(section, settings, lotName = 'Campus Parking Lot') {
   const thresholdMs = (Number(settings?.freshnessMinutes) || 60) * 60 * 1000;
   const updatedMs = section.updatedAt ? Date.parse(section.updatedAt) : 0;
   const ageMs = updatedMs ? Math.max(0, Date.now() - updatedMs) : Infinity;
   const isStale = !updatedMs || ageMs > thresholdMs;
 
+  const capacity = Number(section.capacity ?? section.totalCapacity ?? 0) || null;
+  const availableSpaces =
+    section.availableSpaces !== undefined && section.availableSpaces !== null
+      ? Number(section.availableSpaces)
+      : section.availableSpots !== undefined && section.availableSpots !== null
+      ? Number(section.availableSpots)
+      : null;
+
   return {
     ...section,
+    lotName: section.lotName || lotName,
+    capacity,
+    totalCapacity: capacity || 50,
+    availableSpaces,
+    availableSpots: availableSpaces ?? 0,
+    hasReliableCount: Boolean(
+      section.hasReliableCount ?? (availableSpaces !== null && !Number.isNaN(availableSpaces))
+    ),
+    entrance: section.entrance || section.landmarkHint || 'Main lot entrance',
+    landmarkHint: section.landmarkHint || section.entrance || 'Main lot entrance',
+    restrictions: section.restrictions || section.accessLabel || 'Standard campus permit',
+    accessLabel: section.accessLabel || section.restrictions || 'Standard campus permit',
+    source: section.source || section.updatedBy || 'Staff',
+    updatedBy: section.updatedBy || section.source || 'Staff',
+    recordedStatus: section.status || 'Available',
     isStale,
     ageMinutes: Number.isFinite(ageMs) ? Math.floor(ageMs / 60000) : null,
     effectiveStatus: isStale && section.status !== 'Closed' ? 'Unknown' : section.status,
   };
 }
 
-function computeSessionState(session, settings) {
+function computeSessionState(session, settings, catalog = null) {
   if (!session) return null;
   const staleHours = Number(settings?.staleVehicleHours) || 12;
   const parkedMs = session.parkedAt ? Date.parse(session.parkedAt) : Date.now();
@@ -234,19 +326,53 @@ function computeSessionState(session, settings) {
   const elapsedMinutes = Math.floor(elapsedMs / 60000);
   const isLongRunning = elapsedMs > staleHours * 3600 * 1000;
 
+  const matchedSec = catalog?.sections?.find((s) => s.id === session.sectionId);
+  const rowVal = String(session.row ?? session.rowIdentifier ?? '').trim();
+  const bayVal = String(session.bay ?? session.bayIdentifier ?? '').trim();
+  const noteVal = String(session.note ?? session.landmarkNote ?? '').trim();
+
+  const lat =
+    typeof session.latitude === 'number'
+      ? session.latitude
+      : typeof session.gpsCoords?.latitude === 'number'
+      ? session.gpsCoords.latitude
+      : typeof matchedSec?.latitude === 'number'
+      ? matchedSec.latitude
+      : null;
+
+  const lng =
+    typeof session.longitude === 'number'
+      ? session.longitude
+      : typeof session.gpsCoords?.longitude === 'number'
+      ? session.gpsCoords.longitude
+      : typeof matchedSec?.longitude === 'number'
+      ? matchedSec.longitude
+      : null;
+
   return {
     id: session.id,
     userId: session.userId,
     lotId: session.lotId,
-    lotName: session.lotName,
+    lotName: session.lotName || 'Campus Parking Lot',
     sectionId: session.sectionId,
-    sectionCode: session.sectionCode,
-    sectionName: session.sectionName,
-    vehicleType: session.vehicleType,
-    rowIdentifier: session.rowIdentifier || '',
-    bayIdentifier: session.bayIdentifier || '',
-    landmarkNote: session.landmarkNote || '',
-    gpsCoords: session.gpsCoords || null,
+    sectionCode: session.sectionCode || matchedSec?.code || '',
+    sectionName: session.sectionName || matchedSec?.name || 'Campus Section',
+    vehicleType: session.vehicleType || 'bike',
+    row: rowVal,
+    rowIdentifier: rowVal,
+    bay: bayVal,
+    bayIdentifier: bayVal,
+    note: noteVal,
+    landmarkNote: noteVal,
+    entrance:
+      session.entrance ||
+      matchedSec?.entrance ||
+      matchedSec?.landmarkHint ||
+      'Follow main lot entrance signage',
+    destination: session.destination || matchedSec?.destination || '',
+    latitude: lat,
+    longitude: lng,
+    gpsCoords: lat !== null && lng !== null ? { latitude: lat, longitude: lng } : null,
     hasPhoto: Boolean(session.photoDataUrl),
     photoUrl: session.photoDataUrl || null,
     parkedAt: session.parkedAt,
@@ -380,14 +506,20 @@ class ParkingService {
   async fetchParkingData() {
     const catalog = this.loadCatalog();
     this.settings = { ...this.settings, ...(catalog.settings || {}) };
-    this.lots = catalog.lots.filter((l) => l.active !== false);
+    this.lots = catalog.lots
+      .filter((l) => l.active !== false)
+      .map((l) => ({
+        ...l,
+        code: l.code || l.id.toUpperCase(),
+      }));
     this.destinations = Array.isArray(catalog.destinations) ? catalog.destinations : [];
     this.sections = catalog.sections.map((sec) => {
       const lot = catalog.lots.find((l) => l.id === sec.lotId);
-      return {
-        ...computeFreshnessState(sec, this.settings),
-        lotName: lot ? lot.name : 'Campus Parking Lot',
-      };
+      return normalizeSectionRecord(
+        sec,
+        this.settings,
+        lot ? lot.name : 'Campus Parking Lot'
+      );
     });
     this.notify();
     return {
@@ -412,6 +544,7 @@ class ParkingService {
     const section = catalog.sections.find(
       (sec) =>
         String(sec.code || '').toUpperCase() === code ||
+        String(sec.qrCode || '').toUpperCase() === code ||
         String(sec.id || '').toUpperCase() === code
     );
     if (!section) {
@@ -419,14 +552,15 @@ class ParkingService {
     }
 
     const lot = catalog.lots.find((l) => l.id === section.lotId);
-    return {
-      ...computeFreshnessState(section, catalog.settings),
-      lotName: lot ? lot.name : 'Campus Parking Lot',
-    };
+    return normalizeSectionRecord(
+      section,
+      catalog.settings,
+      lot ? lot.name : 'Campus Parking Lot'
+    );
   }
 
   async fetchActiveSession() {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     if (!user?.id) {
       this.activeSession = null;
       this.notify();
@@ -436,13 +570,13 @@ class ParkingService {
     const catalog = this.loadCatalog();
     const allSessions = readJsonStorage(STORAGE_KEYS.sessions, []);
     const active = allSessions.find((s) => s.userId === user.id && s.status === 'active');
-    this.activeSession = computeSessionState(active || null, catalog.settings);
+    this.activeSession = computeSessionState(active || null, catalog.settings, catalog);
     this.notify();
     return this.activeSession;
   }
 
-  async saveParkingSession(sessionData) {
-    const user = authService.currentUser;
+  async saveParkingSession(sessionData = {}) {
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     if (!user?.id) {
       throw new Error('Authentication required to save a parking location.');
     }
@@ -451,7 +585,10 @@ class ParkingService {
     const allSessions = readJsonStorage(STORAGE_KEYS.sessions, []);
     const existingActive = allSessions.find((s) => s.userId === user.id && s.status === 'active');
 
-    if (existingActive && !sessionData.replaceExisting) {
+    const shouldReplace = Boolean(
+      sessionData.replaceActive ?? sessionData.replaceExisting ?? true
+    );
+    if (existingActive && !shouldReplace) {
       const err = new Error(
         'You already have an active parked vehicle saved. Replace your existing session or update it instead.'
       );
@@ -460,28 +597,18 @@ class ParkingService {
     }
 
     const sectionId = String(sessionData.sectionId || '').trim();
-    const section = catalog.sections.find((s) => s.id === sectionId || s.code === sectionId);
-    if (!section) {
-      throw new Error('Please select a valid campus parking section.');
-    }
+    const section = catalog.sections.find(
+      (s) => s.id === sectionId || s.code === sectionId
+    );
+    const lot =
+      catalog.lots.find((l) => l.id === (section?.lotId || sessionData.lotId)) ||
+      catalog.lots[0];
 
-    const vehicleType = String(sessionData.vehicleType || '')
+    const vehicleType = String(sessionData.vehicleType || 'bike')
       .trim()
       .toLowerCase();
     if (!['bike', 'car', 'other'].includes(vehicleType)) {
       throw new Error('Please select your vehicle type (Bike, Car, or Other).');
-    }
-
-    if (!section.vehicleTypes.includes(vehicleType)) {
-      throw new Error(
-        `Selected section (${section.name}) does not support ${vehicleType} parking.`
-      );
-    }
-
-    if (section.accessRule === 'staff_only' && user.role !== 'staff') {
-      throw new Error(
-        'This section is reserved for authorized campus staff and faculty permits.'
-      );
     }
 
     if (existingActive) {
@@ -489,43 +616,70 @@ class ParkingService {
       existingActive.endedAt = new Date().toISOString();
     }
 
-    const lot = catalog.lots.find((l) => l.id === section.lotId);
     const nowIso = new Date().toISOString();
+    const rowVal = String(sessionData.row ?? sessionData.rowIdentifier ?? '')
+      .trim()
+      .slice(0, 60);
+    const bayVal = String(sessionData.bay ?? sessionData.bayIdentifier ?? '')
+      .trim()
+      .slice(0, 60);
+    const noteVal = String(sessionData.note ?? sessionData.landmarkNote ?? '')
+      .trim()
+      .slice(0, 300);
+
+    const lat =
+      typeof sessionData.latitude === 'number'
+        ? sessionData.latitude
+        : typeof sessionData.gpsCoords?.latitude === 'number'
+        ? sessionData.gpsCoords.latitude
+        : typeof section?.latitude === 'number'
+        ? section.latitude
+        : null;
+    const lng =
+      typeof sessionData.longitude === 'number'
+        ? sessionData.longitude
+        : typeof sessionData.gpsCoords?.longitude === 'number'
+        ? sessionData.gpsCoords.longitude
+        : typeof section?.longitude === 'number'
+        ? section.longitude
+        : null;
+
     const newSession = {
       id: `ps_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       userId: user.id,
-      lotId: section.lotId,
-      lotName: lot ? lot.name : 'Campus Parking Lot',
-      sectionId: section.id,
-      sectionCode: section.code,
-      sectionName: section.name,
+      lotId: section?.lotId || lot?.id || 'lot-manual',
+      lotName: lot?.name || sessionData.lotName || 'Campus Parking Lot',
+      sectionId: section?.id || 'sec-manual',
+      sectionCode: section?.code || '',
+      sectionName: section?.name || sessionData.sectionName || 'Campus Section',
+      entrance: section?.entrance || section?.landmarkHint || 'Main lot entrance',
+      destination: section?.destination || lot?.destination || '',
       vehicleType,
-      rowIdentifier: String(sessionData.rowIdentifier || '')
-        .trim()
-        .slice(0, 60),
-      bayIdentifier: String(sessionData.bayIdentifier || '')
-        .trim()
-        .slice(0, 60),
-      landmarkNote: String(sessionData.landmarkNote || '')
-        .trim()
-        .slice(0, 280),
-      gpsCoords: sessionData.gpsCoords || null,
+      row: rowVal,
+      rowIdentifier: rowVal,
+      bay: bayVal,
+      bayIdentifier: bayVal,
+      note: noteVal,
+      landmarkNote: noteVal,
+      latitude: lat,
+      longitude: lng,
+      gpsCoords: lat !== null && lng !== null ? { latitude: lat, longitude: lng } : null,
       photoDataUrl: sessionData.photoDataUrl || null,
       status: 'active',
-      parkedAt: nowIso,
+      parkedAt: sessionData.parkedAt || nowIso,
       updatedAt: nowIso,
     };
 
     allSessions.push(newSession);
     writeJsonStorage(STORAGE_KEYS.sessions, allSessions);
 
-    this.activeSession = computeSessionState(newSession, catalog.settings);
+    this.activeSession = computeSessionState(newSession, catalog.settings, catalog);
     this.notify();
     return this.activeSession;
   }
 
-  async updateParkingSession(sessionId, updates) {
-    const user = authService.currentUser;
+  async updateParkingSession(sessionId, updates = {}) {
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     if (!user?.id) {
       throw new Error('Authentication required.');
     }
@@ -539,25 +693,27 @@ class ParkingService {
       throw new Error('Active parking session not found.');
     }
 
+    if (updates.confirmStillParked) {
+      session.parkedAt = new Date().toISOString();
+      session.updatedAt = session.parkedAt;
+      writeJsonStorage(STORAGE_KEYS.sessions, allSessions);
+      this.activeSession = computeSessionState(session, catalog.settings, catalog);
+      this.notify();
+      return this.activeSession;
+    }
+
     if (updates.sectionId && updates.sectionId !== session.sectionId) {
       const nextSec = catalog.sections.find((s) => s.id === updates.sectionId);
-      if (!nextSec) {
-        throw new Error('Selected parking section is invalid.');
+      if (nextSec) {
+        const lot = catalog.lots.find((l) => l.id === nextSec.lotId);
+        session.lotId = nextSec.lotId;
+        session.lotName = lot ? lot.name : 'Campus Parking Lot';
+        session.sectionId = nextSec.id;
+        session.sectionCode = nextSec.code;
+        session.sectionName = nextSec.name;
+        session.entrance = nextSec.entrance || nextSec.landmarkHint || 'Main lot entrance';
+        session.destination = nextSec.destination || '';
       }
-      const nextType = updates.vehicleType
-        ? String(updates.vehicleType).toLowerCase()
-        : session.vehicleType;
-      if (!nextSec.vehicleTypes.includes(nextType)) {
-        throw new Error(
-          `Selected section (${nextSec.name}) does not support ${nextType} parking.`
-        );
-      }
-      const lot = catalog.lots.find((l) => l.id === nextSec.lotId);
-      session.lotId = nextSec.lotId;
-      session.lotName = lot ? lot.name : 'Campus Parking Lot';
-      session.sectionId = nextSec.id;
-      session.sectionCode = nextSec.code;
-      session.sectionName = nextSec.name;
     }
 
     if (
@@ -566,18 +722,39 @@ class ParkingService {
     ) {
       session.vehicleType = String(updates.vehicleType).toLowerCase();
     }
-    if (typeof updates.rowIdentifier === 'string') {
-      session.rowIdentifier = updates.rowIdentifier.trim().slice(0, 60);
+
+    const nextRow = updates.row ?? updates.rowIdentifier;
+    if (typeof nextRow === 'string') {
+      session.row = nextRow.trim().slice(0, 60);
+      session.rowIdentifier = session.row;
     }
-    if (typeof updates.bayIdentifier === 'string') {
-      session.bayIdentifier = updates.bayIdentifier.trim().slice(0, 60);
+
+    const nextBay = updates.bay ?? updates.bayIdentifier;
+    if (typeof nextBay === 'string') {
+      session.bay = nextBay.trim().slice(0, 60);
+      session.bayIdentifier = session.bay;
     }
-    if (typeof updates.landmarkNote === 'string') {
-      session.landmarkNote = updates.landmarkNote.trim().slice(0, 280);
+
+    const nextNote = updates.note ?? updates.landmarkNote;
+    if (typeof nextNote === 'string') {
+      session.note = nextNote.trim().slice(0, 300);
+      session.landmarkNote = session.note;
     }
-    if (updates.gpsCoords !== undefined) {
+
+    if (typeof updates.latitude === 'number' && typeof updates.longitude === 'number') {
+      session.latitude = updates.latitude;
+      session.longitude = updates.longitude;
+      session.gpsCoords = { latitude: updates.latitude, longitude: updates.longitude };
+    } else if (updates.gpsCoords !== undefined) {
       session.gpsCoords = updates.gpsCoords;
+      session.latitude = updates.gpsCoords?.latitude ?? null;
+      session.longitude = updates.gpsCoords?.longitude ?? null;
     }
+
+    if (updates.parkedAt) {
+      session.parkedAt = updates.parkedAt;
+    }
+
     if (updates.removePhoto) {
       session.photoDataUrl = null;
     } else if (updates.photoDataUrl) {
@@ -587,13 +764,13 @@ class ParkingService {
     session.updatedAt = new Date().toISOString();
     writeJsonStorage(STORAGE_KEYS.sessions, allSessions);
 
-    this.activeSession = computeSessionState(session, catalog.settings);
+    this.activeSession = computeSessionState(session, catalog.settings, catalog);
     this.notify();
     return this.activeSession;
   }
 
   async endParkingSession(sessionId) {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     if (!user?.id) {
       throw new Error('Authentication required.');
     }
@@ -614,7 +791,7 @@ class ParkingService {
   }
 
   async submitSectionReport({ sectionId, sectionName, issueType, description }) {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     if (!user?.id) {
       throw new Error('Please log in to submit a section report.');
     }
@@ -629,10 +806,11 @@ class ParkingService {
       issueType: String(issueType || '').trim(),
       description: String(description || '')
         .trim()
-        .slice(0, 300),
+        .slice(0, 400),
       reportedByUserId: user.id,
-      reportedByName: user.fullName,
-      status: 'pending_review',
+      reportedByName: user.fullName || 'Campus Member',
+      reporterName: user.fullName || 'Campus Member',
+      status: 'pending',
       verified: false,
       createdAt: new Date().toISOString(),
     };
@@ -647,90 +825,109 @@ class ParkingService {
   // ---------------------------------------------------------------------------
   async fetchStaffOverview() {
     const catalog = this.loadCatalog();
-    const reports = readJsonStorage(STORAGE_KEYS.reports, []);
+    const reports = readJsonStorage(STORAGE_KEYS.reports, []).map((r) => ({
+      ...r,
+      reporterName: r.reporterName || r.reportedByName || 'Campus Member',
+      status: r.status === 'pending_review' ? 'pending' : r.status || 'pending',
+    }));
     const auditLogs = readJsonStorage(STORAGE_KEYS.auditLogs, []);
     return {
-      lots: catalog.lots,
-      sections: catalog.sections.map((sec) => computeFreshnessState(sec, catalog.settings)),
+      lots: catalog.lots.map((l) => ({ ...l, code: l.code || l.id.toUpperCase() })),
+      sections: catalog.sections.map((sec) => {
+        const lot = catalog.lots.find((l) => l.id === sec.lotId);
+        return normalizeSectionRecord(
+          sec,
+          catalog.settings,
+          lot ? lot.name : 'Campus Parking Lot'
+        );
+      }),
       reports: reports.slice(0, 50),
+      statusHistory: auditLogs.slice(0, 50),
       auditLogs: auditLogs.slice(0, 50),
       settings: catalog.settings,
     };
   }
 
   async createLot(lotData) {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     const catalog = this.loadCatalog();
+    const dest = String(lotData.destination || '').trim() || 'Academic Block A';
+    if (!catalog.destinations.includes(dest)) {
+      catalog.destinations.push(dest);
+    }
     const lot = {
       id: `lot_${Date.now().toString(36)}`,
+      code: String(lotData.code || `LOT-${catalog.lots.length + 1}`)
+        .trim()
+        .toUpperCase(),
       name: String(lotData.name || '').trim(),
+      destination: dest,
       description: String(lotData.description || '').trim(),
       nearestDestinations: Array.isArray(lotData.nearestDestinations)
         ? lotData.nearestDestinations
-        : ['Academic Block A'],
+        : [dest],
       active: true,
     };
     catalog.lots.push(lot);
     this.saveCatalog(catalog);
 
-    const logs = readJsonStorage(STORAGE_KEYS.auditLogs, []);
-    logs.unshift({
-      id: `aud_${Date.now()}`,
-      action: 'CREATE_LOT',
-      targetName: lot.name,
-      staffName: user?.fullName || 'Staff',
-      staffEmail: user?.email || '',
-      timestamp: new Date().toISOString(),
-      details: `Created parking lot "${lot.name}"`,
-    });
-    writeJsonStorage(STORAGE_KEYS.auditLogs, logs);
-
-    await this.fetchParkingData();
-    return lot;
-  }
-
-  async updateLot(lotId, lotData) {
-    const catalog = this.loadCatalog();
-    const lot = catalog.lots.find((l) => l.id === lotId);
-    if (!lot) throw new Error('Parking lot not found.');
-    if (typeof lotData.name === 'string' && lotData.name.trim()) lot.name = lotData.name.trim();
-    if (typeof lotData.description === 'string') lot.description = lotData.description.trim();
-    if (typeof lotData.active === 'boolean') lot.active = lotData.active;
-    this.saveCatalog(catalog);
     await this.fetchParkingData();
     return lot;
   }
 
   async createSection(sectionData) {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     const catalog = this.loadCatalog();
     const lot = catalog.lots.find((l) => l.id === sectionData.lotId);
     if (!lot) throw new Error('Please select a valid parent parking lot.');
 
-    const totalCapacity = Math.max(1, Number(sectionData.totalCapacity) || 50);
-    const availableSpots = Math.min(
-      totalCapacity,
-      Math.max(0, Number(sectionData.availableSpots ?? totalCapacity))
-    );
+    const capacityVal = Number(sectionData.capacity ?? sectionData.totalCapacity) || 50;
+    const codeVal = String(sectionData.code || '')
+      .trim()
+      .toUpperCase();
+    const entranceVal =
+      String(sectionData.entrance || sectionData.landmarkHint || '').trim() ||
+      `Located inside ${lot.name}`;
+    const destVal =
+      String(sectionData.destination || '').trim() ||
+      lot.destination ||
+      lot.nearestDestinations?.[0] ||
+      'Academic Block A';
+
+    if (destVal && !catalog.destinations.includes(destVal)) {
+      catalog.destinations.push(destVal);
+    }
+
     const section = {
       id: `sec_${Date.now().toString(36)}`,
       lotId: lot.id,
-      code: String(sectionData.code || '')
+      code: codeVal,
+      qrCode: String(sectionData.qrCode || codeVal)
         .trim()
         .toUpperCase(),
       name: String(sectionData.name || '').trim(),
-      vehicleTypes: Array.isArray(sectionData.vehicleTypes) ? sectionData.vehicleTypes : ['bike'],
-      destination: sectionData.destination || lot.nearestDestinations[0] || 'Academic Block A',
+      vehicleTypes:
+        Array.isArray(sectionData.vehicleTypes) && sectionData.vehicleTypes.length > 0
+          ? sectionData.vehicleTypes
+          : ['bike'],
+      destination: destVal,
       walkingMinutes: Math.max(1, Number(sectionData.walkingMinutes) || 3),
       accessRule: sectionData.accessRule || 'general',
-      accessLabel: sectionData.accessLabel || 'Students & Staff',
-      totalCapacity,
-      availableSpots,
+      accessLabel: sectionData.restrictions || sectionData.accessLabel || 'Students & Staff Permit',
+      restrictions:
+        sectionData.restrictions || sectionData.accessLabel || 'Students & Staff Permit',
+      capacity: capacityVal,
+      totalCapacity: capacityVal,
+      availableSpaces: capacityVal,
+      availableSpots: capacityVal,
+      hasReliableCount: true,
       status: sectionData.status || 'Available',
       updatedAt: new Date().toISOString(),
       updatedBy: user?.fullName || 'Staff',
+      source: 'Staff Configuration',
       rows: Array.isArray(sectionData.rows) ? sectionData.rows : ['Row A', 'Row B', 'Row C'],
-      landmarkHint: String(sectionData.landmarkHint || '').trim() || `Located inside ${lot.name}`,
+      entrance: entranceVal,
+      landmarkHint: entranceVal,
     };
 
     catalog.sections.push(section);
@@ -739,62 +936,38 @@ class ParkingService {
     return section;
   }
 
-  async updateSection(sectionId, sectionData) {
-    const user = authService.currentUser;
-    const catalog = this.loadCatalog();
-    const section = catalog.sections.find((s) => s.id === sectionId);
-    if (!section) throw new Error('Parking section not found.');
-
-    if (typeof sectionData.name === 'string' && sectionData.name.trim()) {
-      section.name = sectionData.name.trim();
-    }
-    if (typeof sectionData.code === 'string' && sectionData.code.trim()) {
-      section.code = sectionData.code.trim().toUpperCase();
-    }
-    if (typeof sectionData.destination === 'string' && sectionData.destination.trim()) {
-      section.destination = sectionData.destination.trim();
-    }
-    if (sectionData.totalCapacity !== undefined) {
-      section.totalCapacity = Math.max(
-        1,
-        Number(sectionData.totalCapacity) || section.totalCapacity
-      );
-      section.availableSpots = Math.min(section.totalCapacity, section.availableSpots);
-    }
-    if (Array.isArray(sectionData.vehicleTypes) && sectionData.vehicleTypes.length > 0) {
-      section.vehicleTypes = sectionData.vehicleTypes;
-    }
-    if (sectionData.accessRule) {
-      section.accessRule = sectionData.accessRule;
-    }
-    if (typeof sectionData.landmarkHint === 'string') {
-      section.landmarkHint = sectionData.landmarkHint.trim();
-    }
-    section.updatedAt = new Date().toISOString();
-    section.updatedBy = user?.fullName || 'Staff';
-
-    this.saveCatalog(catalog);
-    await this.fetchParkingData();
-    return computeFreshnessState(section, catalog.settings);
-  }
-
   async updateSectionStatus(sectionId, statusData) {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     const catalog = this.loadCatalog();
     const section = catalog.sections.find((s) => s.id === sectionId);
     if (!section) throw new Error('Parking section not found.');
 
+    const previousStatus = section.status || 'Available';
     if (statusData.status) {
       section.status = statusData.status;
     }
-    if (statusData.availableSpots !== undefined) {
-      section.availableSpots = Math.max(
-        0,
-        Math.min(section.totalCapacity, Number(statusData.availableSpots) || 0)
-      );
+
+    const rawSpaces = statusData.availableSpaces ?? statusData.availableSpots;
+    if (rawSpaces !== undefined && rawSpaces !== '') {
+      const cap = Number(section.capacity || section.totalCapacity || 100);
+      const count = Math.max(0, Math.min(cap, Number(rawSpaces) || 0));
+      section.availableSpaces = count;
+      section.availableSpots = count;
     } else if (section.status === 'Full' || section.status === 'Closed') {
+      section.availableSpaces = 0;
       section.availableSpots = 0;
     }
+
+    if (statusData.hasReliableCount !== undefined) {
+      section.hasReliableCount = Boolean(statusData.hasReliableCount);
+    }
+    if (statusData.closureReason !== undefined) {
+      section.closureReason = String(statusData.closureReason || '').trim();
+    }
+    if (statusData.source) {
+      section.source = String(statusData.source).trim();
+    }
+
     section.updatedAt = new Date().toISOString();
     section.updatedBy = user?.fullName || 'Staff';
     this.saveCatalog(catalog);
@@ -802,11 +975,18 @@ class ParkingService {
     const auditEntry = {
       id: `aud_${Date.now()}`,
       action: 'UPDATE_SECTION_STATUS',
-      targetName: section.name,
-      staffName: user?.fullName || 'Staff',
-      staffEmail: user?.email || '',
+      sectionId: section.id,
+      sectionName: section.name,
+      sectionCode: section.code,
+      previousStatus,
+      newStatus: section.status,
+      note:
+        statusData.note ||
+        statusData.closureReason ||
+        `Updated availability to ${section.status}`,
+      source: section.source || 'Staff Update',
+      updatedBy: user?.fullName || 'Staff',
       timestamp: section.updatedAt,
-      details: `Set ${section.name} to ${section.status} (${section.availableSpots}/${section.totalCapacity} spots)`,
     };
     const logs = readJsonStorage(STORAGE_KEYS.auditLogs, []);
     logs.unshift(auditEntry);
@@ -814,28 +994,23 @@ class ParkingService {
 
     await this.fetchParkingData();
     return {
-      section: computeFreshnessState(section, catalog.settings),
+      section: normalizeSectionRecord(section, catalog.settings),
       auditEntry,
     };
   }
 
   async reviewReport(reportId, reviewData) {
-    const user = authService.currentUser;
+    const user = authService.currentUser || authService.loadCachedUserProfile();
     const reports = readJsonStorage(STORAGE_KEYS.reports, []);
     const report = reports.find((r) => r.id === reportId);
     if (!report) throw new Error('Report not found.');
 
-    report.status = reviewData.status === 'dismissed' ? 'dismissed' : 'verified';
-    report.verified = report.status === 'verified';
+    report.status = reviewData.status === 'dismissed' ? 'dismissed' : 'reviewed';
+    report.verified = report.status === 'reviewed';
     report.reviewedBy = user?.fullName || 'Staff';
     report.reviewedAt = new Date().toISOString();
     writeJsonStorage(STORAGE_KEYS.reports, reports);
 
-    if (report.verified && reviewData.applySectionStatus && report.sectionId !== 'general') {
-      await this.updateSectionStatus(report.sectionId, {
-        status: reviewData.applySectionStatus,
-      }).catch(() => {});
-    }
     return report;
   }
 
@@ -843,8 +1018,8 @@ class ParkingService {
     const catalog = this.loadCatalog();
     if (settingsData.freshnessMinutes !== undefined) {
       catalog.settings.freshnessMinutes = Math.max(
-        5,
-        Math.min(720, Number(settingsData.freshnessMinutes) || 60)
+        1,
+        Math.min(10080, Number(settingsData.freshnessMinutes) || 60)
       );
     }
     if (settingsData.staleVehicleHours !== undefined) {
@@ -859,4 +1034,13 @@ class ParkingService {
   }
 }
 
-export const parkingService = new ParkingService();
+const sharedParkingService =
+  typeof window !== 'undefined' && window.__PARKTRACE_PARKING_SERVICE__
+    ? window.__PARKTRACE_PARKING_SERVICE__
+    : new ParkingService();
+
+if (typeof window !== 'undefined') {
+  window.__PARKTRACE_PARKING_SERVICE__ = sharedParkingService;
+}
+
+export const parkingService = sharedParkingService;

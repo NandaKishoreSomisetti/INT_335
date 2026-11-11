@@ -5,7 +5,7 @@
  * using `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb6';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb8';
 
 const supabaseUrl = SUPABASE_CONFIG?.url;
 const supabaseAnonKey = SUPABASE_CONFIG?.anonKey;
@@ -67,8 +67,11 @@ const adaptiveBrowserStorage = {
 };
 
 function initSyncSupabaseClient() {
+  if (typeof window !== 'undefined' && window.__PARKTRACE_SUPABASE_CLIENT__) {
+    return window.__PARKTRACE_SUPABASE_CLIENT__;
+  }
   if (typeof window !== 'undefined' && window.supabase?.createClient) {
-    return window.supabase.createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
+    const client = window.supabase.createClient(supabaseUrl.trim(), supabaseAnonKey.trim(), {
       auth: {
         storageKey: STORAGE_KEYS.supabaseAuthToken,
         storage: adaptiveBrowserStorage,
@@ -77,6 +80,8 @@ function initSyncSupabaseClient() {
         detectSessionInUrl: true,
       },
     });
+    window.__PARKTRACE_SUPABASE_CLIENT__ = client;
+    return client;
   }
   return null;
 }
@@ -88,6 +93,10 @@ export let supabase = initSyncSupabaseClient();
  */
 export async function getSupabaseClient() {
   if (supabase) {
+    return supabase;
+  }
+  if (typeof window !== 'undefined' && window.__PARKTRACE_SUPABASE_CLIENT__) {
+    supabase = window.__PARKTRACE_SUPABASE_CLIENT__;
     return supabase;
   }
 
@@ -127,6 +136,10 @@ export async function getSupabaseClient() {
       detectSessionInUrl: isBrowser,
     },
   });
+
+  if (isBrowser) {
+    window.__PARKTRACE_SUPABASE_CLIENT__ = supabase;
+  }
 
   return supabase;
 }

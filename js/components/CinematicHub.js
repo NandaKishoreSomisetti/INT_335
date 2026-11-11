@@ -20,13 +20,13 @@
  *   freshness policy, user reports review, and status-update audit history)
  */
 
-import { authService } from '../services/authService.js?v=sb6';
+import { authService } from '../services/authService.js?v=sb8';
 import {
   parkingService,
   recommendParkingSections,
-} from '../services/parkingService.js?v=sb6';
-import { renderBrandLogo } from './BrandLogo.js?v=sb6';
-import { ReviewSection } from './ReviewSection.js?v=sb6';
+} from '../services/parkingService.js?v=sb8';
+import { renderBrandLogo } from './BrandLogo.js?v=sb8';
+import { ReviewSection } from './ReviewSection.js?v=sb8';
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -172,9 +172,12 @@ export class CinematicHub {
     window.addEventListener('beforeunload', stopAllCameras);
   }
 
-  async activate(initialView = 'overview') {
+  async activate(initialView = 'overview', sessionUser = null) {
     if (!this.mountNode) return;
-    const user = authService.currentUser;
+    if (sessionUser && !authService.currentUser) {
+      authService.currentUser = sessionUser;
+    }
+    const user = authService.currentUser || sessionUser || authService.loadCachedUserProfile();
     if (!user) return;
 
     const allowedViews = ['overview', 'find-parking', 'my-vehicle', 'reviews', 'profile'];
@@ -1523,7 +1526,11 @@ export class CinematicHub {
                 <div class="vehicle-photo-block">
                   <p class="form-label">Private Surroundings Photo (Visible only to you)</p>
                   <img
-                    src="${escapeHtml(activeSession.photoUrl)}?t=${Date.now()}"
+                    src="${escapeHtml(
+                      activeSession.photoUrl.startsWith('data:')
+                        ? activeSession.photoUrl
+                        : `${activeSession.photoUrl}?t=${Date.now()}`
+                    )}"
                     alt="Saved surroundings photo for your parked vehicle"
                     class="vehicle-photo-preview"
                     loading="lazy"

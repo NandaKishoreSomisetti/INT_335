@@ -248,4 +248,13 @@ class ReviewService {
   }
 }
 
-export const reviewService = new ReviewService();
+const sharedReviewService =
+  typeof window !== 'undefined' && window.__PARKTRACE_REVIEW_SERVICE__
+    ? window.__PARKTRACE_REVIEW_SERVICE__
+    : new ReviewService();
+
+if (typeof window !== 'undefined') {
+  window.__PARKTRACE_REVIEW_SERVICE__ = sharedReviewService;
+}
+
+export const reviewService = sharedReviewService;

@@ -14,11 +14,11 @@
  * - Distinct Loading, Empty ("No reviews yet"), and Unavailable (with Retry) states
  */
 
-import { REVIEWS_CONFIG } from '../config.js?v=sb6';
-import { authService } from '../services/authService.js?v=sb6';
-import { reviewService, sortReviews } from '../services/reviewService.js?v=sb6';
-import { ReviewCard } from './ReviewCard.js?v=sb6';
-import { validateFormOnSubmit } from '../utils/validation.js?v=sb6';
+import { REVIEWS_CONFIG } from '../config.js?v=sb8';
+import { authService } from '../services/authService.js?v=sb8';
+import { reviewService, sortReviews } from '../services/reviewService.js?v=sb8';
+import { ReviewCard } from './ReviewCard.js?v=sb8';
+import { validateFormOnSubmit } from '../utils/validation.js?v=sb8';
 
 function escapeHtml(str) {
   return String(str)
