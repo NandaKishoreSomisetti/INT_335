@@ -12,12 +12,14 @@ export class Header {
    * @param {Function} options.onToggleReviews
    * @param {Function} options.onOpenSupport
    */
-  constructor({ mountNode, onToggleReviews, onOpenSupport }) {
+  constructor({ mountNode, onToggleReviews, onOpenSupport, onDemoLogin }) {
     this.mountNode = mountNode;
     this.onToggleReviews = onToggleReviews;
     this.onOpenSupport = onOpenSupport;
+    this.onDemoLogin = onDemoLogin;
     this.reviewsButton = null;
     this.supportButton = null;
+    this.demoLoginButton = null;
   }
 
   render() {
@@ -26,6 +28,15 @@ export class Header {
     this.mountNode.innerHTML = `
       <nav class="top-nav" aria-label="Primary actions">
         <div class="top-nav__actions">
+          <button
+            type="button"
+            id="header-demo-login-btn"
+            class="nav-pill-btn nav-pill-btn--demo"
+            data-quick-demo-login
+          >
+            <span class="auth-demo-btn__icon" aria-hidden="true">⚡</span>
+            <span class="nav-pill-btn__label">Quick Demo Login</span>
+          </button>
           <button
             type="button"
             id="nav-reviews-btn"
@@ -48,8 +59,13 @@ export class Header {
       </nav>
     `;
 
+    this.demoLoginButton = this.mountNode.querySelector('#header-demo-login-btn');
     this.reviewsButton = this.mountNode.querySelector('#nav-reviews-btn');
     this.supportButton = this.mountNode.querySelector('#nav-support-btn');
+
+    this.demoLoginButton?.addEventListener('click', () => {
+      this.onDemoLogin?.();
+    });
 
     this.reviewsButton?.addEventListener('click', () => {
       this.onToggleReviews?.(this.reviewsButton);

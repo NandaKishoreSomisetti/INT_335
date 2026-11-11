@@ -13,14 +13,14 @@
  *    - Parking discovery, saved-vehicle retrieval, shared persistent reviews, and staff controls
  */
 
-import { ASSET_CONFIG } from './config.js?v=sb8';
-import { authService } from './services/authService.js?v=sb8';
-import { initAccessibleValidation } from './utils/validation.js?v=sb8';
-import { Header } from './components/Header.js?v=sb8';
-import { AuthPanel } from './components/AuthPanel.js?v=sb8';
-import { SupportModal } from './components/SupportModal.js?v=sb8';
-import { ReviewSection } from './components/ReviewSection.js?v=sb8';
-import { CinematicHub } from './components/CinematicHub.js?v=sb8';
+import { ASSET_CONFIG } from './config.js?v=sb9';
+import { authService } from './services/authService.js?v=sb9';
+import { initAccessibleValidation } from './utils/validation.js?v=sb9';
+import { Header } from './components/Header.js?v=sb9';
+import { AuthPanel } from './components/AuthPanel.js?v=sb9';
+import { SupportModal } from './components/SupportModal.js?v=sb9';
+import { ReviewSection } from './components/ReviewSection.js?v=sb9';
+import { CinematicHub } from './components/CinematicHub.js?v=sb9';
 
 function initApp() {
   // 1. Configure hero background image source if overridden in ASSET_CONFIG
@@ -50,6 +50,9 @@ function initApp() {
 
   headerComponent = new Header({
     mountNode: headerMount,
+    onDemoLogin: () => {
+      authService.demoLogin();
+    },
     onToggleReviews: () => {
       const isNowOpen = reviewsComponent?.toggle();
       headerComponent?.setReviewsExpanded(isNowOpen);

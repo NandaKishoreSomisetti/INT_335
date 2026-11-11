@@ -11,8 +11,8 @@
  *   block the user from logging in or creating an account.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb8';
-import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb8';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb9';
+import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb9';
 
 export class AuthConfigurationError extends Error {
   constructor(message) {
@@ -377,16 +377,21 @@ class AuthService {
   }
 
   async restoreSession() {
-    // 1. If a user is already authenticated in memory, preserve it
+    // 1. If a user is already authenticated in memory during this page session, preserve it
     if (this.currentUser && this.currentUser.id) {
       return this.currentUser;
     }
 
-    // 2. Check cached user profile immediately so UI restores without delay
+    // 2. Check cached user profile (skip auto-restoring demo user on full page reload
+    //    so the user can always see the Login screen and "⚡ Quick Demo Login" button on refresh)
     const cached = this.loadCachedUserProfile();
     if (cached && cached.id) {
-      this.currentUser = cached;
-      this.notify();
+      if (cached.isDemo || cached.id === 'demo-user-12345') {
+        this.clearCachedUserProfile();
+      } else {
+        this.currentUser = cached;
+        this.notify();
+      }
     }
 
     if (!this.isConfigured()) {

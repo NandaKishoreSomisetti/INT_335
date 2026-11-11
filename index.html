@@ -58,7 +58,7 @@
       rel="stylesheet"
     />
 
-    <link rel="stylesheet" href="./css/styles.css?v=20261111-sb8" />
+    <link rel="stylesheet" href="./css/styles.css?v=20261111-sb9" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -80,10 +80,19 @@
         <div class="hero-backdrop__vignette"></div>
       </div>
 
-      <!-- Minimal Upper-Right Header (Reviews & Support) -->
+      <!-- Minimal Upper-Right Header (Quick Demo Login, Reviews & Support) -->
       <header id="header-mount" class="site-header">
         <nav class="top-nav" aria-label="Primary actions">
           <div class="top-nav__actions">
+            <button
+              type="button"
+              id="header-demo-login-btn"
+              class="nav-pill-btn nav-pill-btn--demo"
+              data-quick-demo-login
+            >
+              <span class="auth-demo-btn__icon" aria-hidden="true">⚡</span>
+              <span class="nav-pill-btn__label">Quick Demo Login</span>
+            </button>
             <button
               type="button"
               id="nav-reviews-btn"
@@ -260,6 +269,6 @@
       );
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="./js/main.js?v=sb8"></script>
+    <script type="module" src="./js/main.js?v=sb9"></script>
   </body>
 </html>

@@ -317,6 +317,29 @@ main:focus {
   color: #ffffff;
 }
 
+.nav-pill-btn--demo {
+  gap: 0.45rem;
+  background: linear-gradient(
+    135deg,
+    #6cac8e 0%,
+    #4c876c 55%,
+    #3d7059 100%
+  );
+  border-color: rgba(180, 232, 206, 0.4);
+  color: #f9fbf9;
+  font-weight: 600;
+}
+
+.nav-pill-btn--demo:hover {
+  filter: brightness(1.08);
+  background: linear-gradient(
+    135deg,
+    #6cac8e 0%,
+    #4c876c 55%,
+    #3d7059 100%
+  );
+}
+
 /* ==========================================================================
    7. Hero Grid & Brand Placement
    ========================================================================== */
