@@ -9,8 +9,16 @@
       content="Find campus parking for bikes, cars, and other vehicles with PARKTRACE. Separate parking sections help you park smarter and find your vehicle more easily."
     />
     <meta name="robots" content="index, follow" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#060c09" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('parktrace-theme');
+          if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/png" href="./assets/parktrace-logo.png" />
     <link rel="apple-touch-icon" href="./assets/parktrace-logo.png" />
 
@@ -60,7 +68,7 @@
       rel="stylesheet"
     />
 
-    <link rel="stylesheet" href="./css/styles.css?v=20261111-sb9" />
+    <link rel="stylesheet" href="./css/styles.css?v=20261121-sb10" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -272,6 +280,6 @@
       );
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script type="module" src="./js/main.js?v=sb9"></script>
+    <script type="module" src="./js/main.js?v=sb10"></script>
   </body>
 </html>

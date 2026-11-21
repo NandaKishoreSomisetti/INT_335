@@ -20,13 +20,14 @@
  *   freshness policy, user reports review, and status-update audit history)
  */
 
-import { authService } from '../services/authService.js?v=sb9';
+import { authService } from '../services/authService.js?v=sb10';
 import {
   parkingService,
   recommendParkingSections,
-} from '../services/parkingService.js?v=sb9';
-import { renderBrandLogo } from './BrandLogo.js?v=sb9';
-import { ReviewSection } from './ReviewSection.js?v=sb9';
+} from '../services/parkingService.js?v=sb10';
+import { renderBrandLogo } from './BrandLogo.js?v=sb10';
+import { getTheme, setTheme } from '../utils/theme.js?v=sb10';
+import { ReviewSection } from './ReviewSection.js?v=sb10';
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -109,7 +110,7 @@ export class CinematicHub {
     this.mountNode = mountNode;
     this.onOpenSupport = onOpenSupport;
 
-    this.activeView = 'overview'; // 'overview' | 'find-parking' | 'my-vehicle' | 'reviews' | 'profile' | 'staff'
+    this.activeView = 'overview'; // 'overview' | 'find-parking' | 'my-vehicle' | 'reviews' | 'profile' | 'options' | 'staff'
     this.mobileMenuOpen = false;
     this.isLoadingData = false;
     this.globalBanner = null; // { type: 'error' | 'info' | 'config', message: string }
@@ -180,7 +181,7 @@ export class CinematicHub {
     const user = authService.currentUser || sessionUser || authService.loadCachedUserProfile();
     if (!user) return;
 
-    const allowedViews = ['overview', 'find-parking', 'my-vehicle', 'reviews', 'profile'];
+    const allowedViews = ['overview', 'find-parking', 'my-vehicle', 'reviews', 'profile', 'options'];
     if (user.role === 'staff' || user.role === 'admin') {
       allowedViews.push('staff');
     }
@@ -366,6 +367,13 @@ export class CinematicHub {
               >
                 Profile
               </button>
+              <button
+                type="button"
+                class="hub-nav-link"
+                data-nav-view="options"
+              >
+                Options
+              </button>
               <span class="hub-navbar__divider" aria-hidden="true"></span>
               <button
                 type="button"
@@ -433,6 +441,9 @@ export class CinematicHub {
               </button>
               <button type="button" class="hub-mobile-link" data-nav-view="profile" role="listitem">
                 Profile
+              </button>
+              <button type="button" class="hub-mobile-link" data-nav-view="options" role="listitem">
+                Options
               </button>
               <div class="hub-mobile-menu__divider" aria-hidden="true"></div>
               <button
@@ -593,6 +604,10 @@ export class CinematicHub {
         container.innerHTML = this.renderProfileMarkup();
         this.bindProfileEvents(container);
         break;
+      case 'options':
+        container.innerHTML = this.renderOptionsMarkup();
+        this.bindOptionsEvents(container);
+        break;
       case 'staff':
         container.innerHTML = this.renderStaffMarkup();
         this.bindStaffEvents(container);
@@ -601,6 +616,75 @@ export class CinematicHub {
         container.innerHTML = this.renderOverviewMarkup();
         this.bindOverviewEvents(container);
     }
+  }
+
+  // ===========================================================================
+  // VIEW: OPTIONS (Appearance + About)
+  // ===========================================================================
+  renderOptionsMarkup() {
+    const theme = getTheme();
+    const isLight = theme === 'light';
+
+    return `
+      <div class="hub-page-header">
+        <div>
+          <p class="hub-eyebrow">Preferences</p>
+          <h1 class="hub-title">Options</h1>
+          <p class="hub-subtitle">Adjust how PARKTRACE looks and learn more about the project.</p>
+        </div>
+      </div>
+
+      <div class="hub-options-grid">
+        <section class="glass-panel hub-card" aria-labelledby="options-appearance-heading">
+          <h2 id="options-appearance-heading" class="hub-card__title">Appearance</h2>
+          <div class="options-row">
+            <div class="options-row__text">
+              <p class="options-row__label" id="options-theme-label">Light mode</p>
+              <p class="options-row__hint" id="options-theme-hint">
+                Currently using the ${isLight ? 'light' : 'dark'} theme. Your choice is saved on this device.
+              </p>
+            </div>
+            <button
+              type="button"
+              id="options-theme-switch"
+              class="theme-switch${isLight ? ' is-on' : ''}"
+              role="switch"
+              aria-checked="${isLight ? 'true' : 'false'}"
+              aria-labelledby="options-theme-label"
+              aria-describedby="options-theme-hint"
+            >
+              <span class="theme-switch__thumb" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="glass-panel hub-card" aria-labelledby="options-about-heading">
+          <h2 id="options-about-heading" class="hub-card__title">About</h2>
+          <p class="options-about__lead">
+            PARKTRACE is a campus vehicle parking discovery and parked-vehicle retrieval system.
+          </p>
+          <dl class="options-about__list">
+            <div class="options-about__item">
+              <dt>Developed by</dt>
+              <dd>Somisetti Nanda Kishore Gupta</dd>
+            </div>
+            <div class="options-about__item">
+              <dt>Application</dt>
+              <dd>PARKTRACE</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+    `;
+  }
+
+  bindOptionsEvents(container) {
+    const toggle = container.querySelector('#options-theme-switch');
+    toggle?.addEventListener('click', () => {
+      setTheme(getTheme() === 'light' ? 'dark' : 'light');
+      this.renderActiveViewContent();
+      this.mountNode?.querySelector('#options-theme-switch')?.focus();
+    });
   }
 
   // ===========================================================================
