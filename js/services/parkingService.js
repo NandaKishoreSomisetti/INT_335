@@ -7,7 +7,7 @@
  *   `/api/sessions` routes (preventing 404 / 405 Method Not Allowed on GitHub Pages).
  */
 
-import { authService } from './authService.js?v=sb10';
+import { authService } from './authService.js?v=sb11';
 
 const STATUS_PRIORITY = {
   Available: 1,

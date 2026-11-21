@@ -20,14 +20,15 @@
  *   freshness policy, user reports review, and status-update audit history)
  */
 
-import { authService } from '../services/authService.js?v=sb10';
+import { authService } from '../services/authService.js?v=sb11';
 import {
   parkingService,
   recommendParkingSections,
-} from '../services/parkingService.js?v=sb10';
-import { renderBrandLogo } from './BrandLogo.js?v=sb10';
-import { getTheme, setTheme } from '../utils/theme.js?v=sb10';
-import { ReviewSection } from './ReviewSection.js?v=sb10';
+} from '../services/parkingService.js?v=sb11';
+import { renderBrandLogo } from './BrandLogo.js?v=sb11';
+import { getTheme, setTheme } from '../utils/theme.js?v=sb11';
+import { playCarTransition } from '../utils/pageTransition.js?v=sb11';
+import { ReviewSection } from './ReviewSection.js?v=sb11';
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -251,18 +252,28 @@ export class CinematicHub {
       this.selectedDestination = options.destination;
     }
 
+    const isViewChange = viewName !== this.activeView;
     this.activeView = viewName;
     this.mobileMenuOpen = false;
     this.globalBanner = null;
 
     this.updateNavbarState();
-    this.renderActiveViewContent();
 
-    if (viewName === 'staff') {
-      this.loadStaffOverview();
+    const swapContent = () => {
+      // Bail out if another navigation replaced this view, or the hub was torn down meanwhile.
+      if (this.activeView !== viewName || !authService.currentUser) return;
+      this.renderActiveViewContent();
+      if (viewName === 'staff') {
+        this.loadStaffOverview();
+      }
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    };
+
+    if (isViewChange) {
+      playCarTransition(swapContent);
+    } else {
+      swapContent();
     }
-
-    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   renderShell() {

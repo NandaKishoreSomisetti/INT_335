@@ -11,8 +11,8 @@
  *   block the user from logging in or creating an account.
  */
 
-import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb10';
-import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb10';
+import { SUPABASE_CONFIG, STORAGE_KEYS } from '../config.js?v=sb11';
+import { supabase as initialSupabase, getSupabaseClient } from './supabaseClient.js?v=sb11';
 
 export class AuthConfigurationError extends Error {
   constructor(message) {

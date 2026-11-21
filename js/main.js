@@ -13,14 +13,15 @@
  *    - Parking discovery, saved-vehicle retrieval, shared persistent reviews, and staff controls
  */
 
-import { ASSET_CONFIG } from './config.js?v=sb10';
-import { authService } from './services/authService.js?v=sb10';
-import { initAccessibleValidation } from './utils/validation.js?v=sb10';
-import { Header } from './components/Header.js?v=sb10';
-import { AuthPanel } from './components/AuthPanel.js?v=sb10';
-import { SupportModal } from './components/SupportModal.js?v=sb10';
-import { ReviewSection } from './components/ReviewSection.js?v=sb10';
-import { CinematicHub } from './components/CinematicHub.js?v=sb10';
+import { ASSET_CONFIG } from './config.js?v=sb11';
+import { authService } from './services/authService.js?v=sb11';
+import { initAccessibleValidation } from './utils/validation.js?v=sb11';
+import { Header } from './components/Header.js?v=sb11';
+import { AuthPanel } from './components/AuthPanel.js?v=sb11';
+import { SupportModal } from './components/SupportModal.js?v=sb11';
+import { ReviewSection } from './components/ReviewSection.js?v=sb11';
+import { CinematicHub } from './components/CinematicHub.js?v=sb11';
+import { playCarTransition } from './utils/pageTransition.js?v=sb11';
 
 function initApp() {
   // 1. Configure hero background image source if overridden in ASSET_CONFIG
@@ -114,7 +115,21 @@ function initApp() {
   reviewsComponent.init();
   hubComponent.init();
 
+  // Tracks public vs. hub mode so the car transition only plays on a real switch
+  let currentMode = null; // null (not yet synced) | 'public' | 'hub'
+
   function syncInterfaceMode(session) {
+    const nextMode = session ? 'hub' : 'public';
+    const isModeSwitch = currentMode !== null && currentMode !== nextMode;
+    currentMode = nextMode;
+    if (isModeSwitch) {
+      playCarTransition(() => applyInterfaceMode(session));
+    } else {
+      applyInterfaceMode(session);
+    }
+  }
+
+  function applyInterfaceMode(session) {
     if (session) {
       // Transition to Authenticated Cinematic Hub
       if (reviewsComponent?.isOpen) {
@@ -179,8 +194,16 @@ function initApp() {
   // 3. Initialize accessible post-interaction validation
   initAccessibleValidation(document);
 
-  // 4. Restore server session if an authentication backend is configured
-  authService.restoreSession();
+  // 4. Restore server session if an authentication backend is configured.
+  // Once restore settles, treat the visible screen as the baseline so later
+  // logins/logouts play the car transition (but the initial restore does not).
+  Promise.resolve(authService.restoreSession())
+    .catch(() => {})
+    .finally(() => {
+      if (currentMode === null) {
+        currentMode = authService.isAuthenticated() ? 'hub' : 'public';
+      }
+    });
 }
 
 if (document.readyState === 'loading') {
